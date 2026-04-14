@@ -1,6 +1,9 @@
 import React, { useState } from "react";
-import API from "../services/api"; // Tera custom API service
+import API from "../services/api"; 
 import { useNavigate } from 'react-router-dom';
+// Firebase Imports
+import { auth } from "../firebaseConfig";
+import { RecaptchaVerifier, signInWithPhoneNumber } from "firebase/auth";
 
 const Auth = () => {
     const [phonenumber, setphonenumber] = useState("");
@@ -10,67 +13,81 @@ const Auth = () => {
     const [isSignup, setIsSignup] = useState(false); 
     const navigate = useNavigate();
 
-    // 1. Send OTP Logic
+    // --- Firebase Recaptcha Setup ---
+    const onCaptchVerify = () => {
+        if (!window.recaptchaVerifier) {
+            window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+                'size': 'invisible',
+                'callback': (response) => {
+                    console.log("Recaptcha verified");
+                }
+            });
+        }
+    }
+
+    // 1. Send OTP Logic (Updated with Firebase)
     const handlesendotp = async () => {
         if (!phonenumber) return alert("Phone number zaroori hai!");
         if (isSignup && !name) return alert("Signup ke liye Name!");
 
         try {
-            // Backend endpoint: /api/sendotp
-            const res = await API.post("/api/sendotp", { phonenumber });
+            onCaptchVerify();
+            const appVerifier = window.recaptchaVerifier;
+            const formatPh = phonenumber.startsWith('+') ? phonenumber : "+91" + phonenumber;
+
+            // Firebase se OTP bhejna
+            const confirmationResult = await signInWithPhoneNumber(auth, formatPh, appVerifier);
+            window.confirmationResult = confirmationResult;
             
-            if (res.data.success) {
-                alert("OTP sent successfully!");
-                setStep(2); 
-            }
+            alert("OTP sent successfully via Firebase!");
+            setStep(2); 
         } catch (err) {
-            console.error("OTP Send Error:", err.response?.data);
-            alert(err.response?.data?.message || "OTP bhejne mein error hai.");
+            console.error("Firebase Send Error:", err);
+            alert("OTP bhejne mein error hai. Check if number is correct!");
         }
     }
 
-    // 2. Verify OTP (Signup/Login) Logic
+    // 2. Verify OTP Logic (Updated with Firebase)
     const handlesubmit = async () => {
         if (!otp) return alert("OTP enter karein");
 
         try {
+            // Firebase OTP Verification
+            const result = await window.confirmationResult.confirm(otp);
+            const user = result.user;
+            console.log("Firebase User Verified:", user);
+
+            // Ab backend ko notify karna (Purana logic intact)
             let res;
             const payload = {
                 phonenumber: phonenumber,
-                otp: otp
+                otp: otp // Backend validation agar rakha hai toh ye jayega
             };
 
             if (isSignup) {
-                // Backend Signup: expects { name, phonenumber, otp }
-                res = await API.post("/api/signup", { 
-                    ...payload, 
-                    name: name 
-                });
+                res = await API.post("/api/signup", { ...payload, name: name });
             } else {
-                // Backend Login: expects { phonenumber, otp }
                 res = await API.post("/api/login", payload);
             }
 
-            // Success handling
             if (res.data) {
-                // Token aur User Info save karna
                 localStorage.setItem("userInfo", JSON.stringify(res.data.user || res.data.newuser));
                 localStorage.setItem("token", res.data.token);
-                
                 alert(res.data.message || "Success!");
-
-                // Onboarding skip karke seedha chat par bhej rahe hain
                 navigate("/chat"); 
             }
         } catch (err) {
-            console.error("Auth Error Detail:", err.response?.data);
-            alert(err.response?.data?.message || "Invalid OTP or Server Error!");
+            console.error("Verification Error:", err);
+            alert("Invalid OTP or Server Error!");
         }
     }
 
     return (
         <div className="min-h-screen w-full flex items-center justify-center bg-[#0d1117] relative overflow-hidden font-sans p-4 md:p-6">
             
+            {/* Firebase Recaptcha Container (Zaroori Hai) */}
+            <div id="recaptcha-container"></div>
+
             {/* Background Glows */}
             <div className="absolute top-[-5%] left-[-5%] md:top-[-10%] md:left-[-10%] w-[200px] h-[200px] md:w-[300px] md:h-[300px] bg-emerald-500/10 blur-[80px] md:blur-[120px] rounded-full"></div>
             <div className="absolute bottom-[-5%] right-[-5%] md:bottom-[-10%] md:right-[-10%] w-[200px] h-[200px] md:w-[300px] md:h-[300px] bg-blue-500/10 blur-[80px] md:blur-[120px] rounded-full"></div>
@@ -83,7 +100,7 @@ const Auth = () => {
                             {step === 1 ? (isSignup ? "Create Account" : "Welcome Back") : "Verification"}
                         </h1>
                         <p className="text-zinc-500 text-xs md:text-sm">
-                            {step === 1 ? "Enter your details to continue." : "Enter the 4-digit code sent to your phone."}
+                            {step === 1 ? "Enter your details to continue." : "Enter the code sent to your phone."}
                         </p>
                     </div>
 
@@ -137,8 +154,8 @@ const Auth = () => {
                              <input 
                                 type="text" 
                                 className="w-full bg-transparent border-b-2 border-white/10 text-center text-4xl md:text-5xl font-light text-white outline-none focus:border-emerald-500 transition-all pb-4 tracking-[10px] md:tracking-[15px]"
-                                placeholder="0000" 
-                                maxLength="4"
+                                placeholder="000000" 
+                                maxLength="6"
                                 value={otp}
                                 inputMode="numeric"
                                 onChange={(e) => setotp(e.target.value)}
