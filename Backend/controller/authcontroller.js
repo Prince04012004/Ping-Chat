@@ -1,11 +1,11 @@
 import User from "../models/User.js";
-import Otp from "../models/Otp.js";
-import jwt from "jsonwebtoken"
+import jwt from "jsonwebtoken";
+
 export const signup = async (req, res) => {
   try {
-    const { name, phonenumber, profilepic, otp } = req.body;
+    const { name, phonenumber, profilepic } = req.body;
 
-    if (!name || !phonenumber || !otp) {
+    if (!name || !phonenumber) {
       return res.status(400).json({
         message: "Invalid credentials",
       });
@@ -18,20 +18,11 @@ export const signup = async (req, res) => {
       });
     }
 
-    const otprecord = await Otp.findOne({ phonenumber });
-    if (!otprecord || otprecord.otp.toString() !== otp.toString()) {
-      return res.status(400).json({
-        message: "Invalid otp",
-      });
-    }
-
     const newuser = await User.create({
       name,
       phonenumber,
       profilepic: profilepic || "",
     });
-
-    await Otp.deleteOne({ phonenumber });
 
     const token = jwt.sign({ id: newuser._id }, process.env.JWT_SECRET, {
       expiresIn: "30d",
@@ -47,7 +38,7 @@ export const signup = async (req, res) => {
   }
 };
 
-export const sendotp = async (req, res) => {
+export const login = async (req, res) => {
   try {
     const { phonenumber } = req.body;
 
@@ -57,72 +48,26 @@ export const sendotp = async (req, res) => {
       });
     }
 
-    const generatedOtp = Math.floor(1000 + Math.random() * 9000).toString();
+    const user = await User.findOne({ phonenumber });
 
-    await Otp.deleteOne({phonenumber})
-
-    const otpPayload=await Otp.create({
-        phonenumber,
-        otp:generatedOtp
-    })
-    res.status(200).json({
-        success:true,
-        message:"OTP sent successfully"
-    })
-  } catch (err) {
-    res.status(500).json({
-        message:err.message
-        
-    })
-  }
-};
-
-//login
-
-export const login=async(req,res)=>{
-  try{
-
-    const {phonenumber,otp}=req.body
-
-    if(!phonenumber||!otp){
-      return res.status(400).json({
-        message:"Phone number and otp is required"
-      })
-    }
-
-    const user=await User.findOne({phonenumber})
-
-    if(!user){
+    if (!user) {
       return res.status(404).json({
-        message:"User not found"
-      })
+        message: "User not found",
+      });
     }
 
-    const otprecord=await Otp.findOne({phonenumber})
-
-  if (!otprecord || otprecord.otp.toString() !== otp.toString()) {
-  return res.status(400).json({
-    message: "Invalid or Expired otp",
-  });
-}
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
       expiresIn: "30d",
     });
 
-    await Otp.deleteOne({phonenumber});
-
     res.status(200).json({
-      message:"Login successfully",
+      message: "Login successfully",
       token,
-      user
-    })
-
-
-  }
-  catch(err){
+      user,
+    });
+  } catch (err) {
     res.status(500).json({
-      message:err.message
-    })
-
+      message: err.message,
+    });
   }
-}
+};
