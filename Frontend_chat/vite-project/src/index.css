@@ -1,0 +1,163 @@
+@charset "UTF-8";
+@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700;900&family=Kalam:wght@400;700&family=Outfit:wght@300;400;600&family=Orbitron:wght@400;700&family=JetBrains+Mono&display=swap');
+
+/* --- DEFAULT VARIABLES (Fallback) --- */
+:root {
+  --bg-main: #050505;
+  --bg-sidebar: #0b0e14;
+  --accent: #10b981;
+  --text-main: #f8fafc;
+  --font-family: 'Outfit', sans-serif;
+  
+  /* New Design Controls */
+  --radius-app: 24px;       /* Overall App Roundness */
+  --radius-msg: 20px 20px 4px 20px; /* Message Bubble Shape */
+  --border-style: solid;    /* solid, dashed, none */
+  --border-width: 1px;
+  --shadow-card: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  --bg-pattern: none;       /* Background Image/Gradient */
+}
+
+/* Global Reset */
+* {
+  font-family: var(--font-family) !important;
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1); /* Smooth Transition for EVERY property */
+  outline: none !important;
+}
+
+body {
+  background-color: var(--bg-main);
+  background-image: var(--bg-pattern); /* Apply Pattern */
+  background-size: cover;
+  color: var(--text-main);
+  margin: 0;
+  overflow: hidden;
+}
+
+/* ------------------------------------------------ */
+/* 2. THEME DESIGN DEFINITIONS (The Core Change)  */
+/* ------------------------------------------------ */
+
+/* --- ✅ 1. MODERN / MINIMAL (Default Vibe) --- */
+.theme-modern {
+  --bg-main: #0a0a0a !important;
+  --accent: #007bff !important; /* Electric Blue */
+  --radius-app: 30px !important;
+  --radius-msg: 20px 20px 4px 20px !important;
+  --shadow-card: 0 10px 15px -3px rgba(0, 123, 255, 0.2) !important;
+}
+
+/* --- 🙏 2. GOD THEME (Temple Architecture) --- */
+.theme-god {
+  --bg-main: #2b0a02 !important; 
+  --bg-sidebar: #3d0e03 !important;
+  --accent: #ff9933 !important; /* Saffron */
+  --font-family: 'Kalam', cursive !important;
+  
+  /* Design Changes */
+  --radius-app: 50px 5px 50px 5px !important; /* Asymmetrical Temple Shape */
+  --radius-msg: 15px !important;
+  --border-style: dashed !important; /* Spiritual connection */
+  --border-width: 2px !important;
+  --bg-pattern: radial-gradient(circle, rgba(255,153,51,0.05) 0%, transparent 70%) !important;
+}
+
+/* --- 💀 3. HORROR THEME (Brutal & Glitchy) --- */
+.theme-horror {
+  --bg-main: #000000 !important;
+  --bg-sidebar: #050000 !important;
+  --accent: #b91c1c !important; /* Crimson Red */
+  --font-family: 'JetBrains Mono', monospace !important;
+  
+  /* Design Changes */
+  --radius-app: 0px !important;   /* No Roundness, Sharp Edges */
+  --radius-msg: 0px !important;
+  --border-style: solid !important;
+  --border-width: 1px !important;
+  --shadow-card: 0 0 30px rgba(185, 28, 28, 0.6) !important;
+  --bg-pattern: repeating-linear-gradient(45deg, #000, #000 10px, #050000 10px, #050000 20px) !important; /* Glitch Pattern */
+}
+
+/* --- 🎮 4. GAMING / CYBERPUNK (Neon & Sharp) --- */
+.theme-gaming {
+  --bg-main: #020617 !important;
+  --accent: #00f2ff !important; /* Neon Cyan */
+  --font-family: 'Orbitron', sans-serif !important;
+  
+  /* Design Changes */
+  --radius-app: 8px !important;   /* Slight Tech Roundness */
+  --radius-msg: 4px !important;
+  --border-style: solid !important;
+  --border-width: 2px !important;
+  --shadow-card: 0 0 15px #00f2ff !important; /* Neon Glow */
+}
+
+/* ------------------------------------------------ */
+/* 3. CORE UTILITIES (Applying variables)         */
+/* ------------------------------------------------ */
+
+/* App Container */
+.app-container {
+  border-radius: var(--radius-app) !important;
+  border: var(--border-width) var(--border-style) rgba(255, 255, 255, 0.05) !important;
+  box-shadow: var(--shadow-card) !important;
+}
+
+/* Sidebar & Panels */
+.sidebar-panel, .glass-panel {
+  border-radius: var(--radius-app) !important;
+  border: var(--border-width) var(--border-style) rgba(255, 255, 255, 0.05) !important;
+}
+
+/* Message Bubbles */
+.msg-mine {
+  background-color: var(--accent) !important;
+  color: #000 !important;
+  border-radius: var(--radius-msg) !important; /* Applied Dynamic Radius */
+  padding: 12px 18px;
+  font-weight: 600;
+  border: var(--border-width) var(--border-style) rgba(0, 0, 0, 0.1) !important;
+}
+
+.theme-horror .msg-mine {
+    animation: flicker 3s infinite; /* Specific horror design */
+}
+
+.msg-theirs {
+  background-color: rgba(255, 255, 255, 0.04) !important;
+  border: var(--border-width) var(--border-style) rgba(255, 255, 255, 0.05) !important;
+  border-radius: var(--radius-msg) !important; /* Applied Dynamic Radius */
+  padding: 12px 18px;
+}
+
+/* 4. ANIMATIONS (Same as before) */
+@keyframes flicker {
+  0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% { opacity: 1; }
+  20%, 24%, 55% { opacity: 0.7; }
+}
+
+/* 5. SCROLLBAR (Syncs with Accent) */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-thumb {
+  background: var(--accent);
+  border-radius: 20px;
+}
+.bg-print-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: var(--bg-pattern);
+  background-size: 150px 150px;
+  opacity: 0.1; /* Prints ki visibility yahan se control hoti hai */
+  transition: all 1s ease-in-out;
+  z-index: 1;
+}
+
+.content-wrapper {
+  position: relative;
+  z-index: 10; /* Taaki content pattern ke upar rahe */
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
