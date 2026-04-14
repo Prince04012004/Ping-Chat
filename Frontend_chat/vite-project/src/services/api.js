@@ -1,8 +1,8 @@
 import axios from "axios";
 
 const API = axios.create({
-  // baseURL: "http://localhost:5000", 
-  baseURL: "https://ping-chat-wj31.onrender.com",
+  baseURL: "http://localhost:5000", 
+  // baseURL: "https://ping-chat-wj31.onrender.com",
 });
 
 // Auto-token attacher

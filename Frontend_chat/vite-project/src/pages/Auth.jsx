@@ -51,23 +51,18 @@ const Auth = () => {
                 res = await API.post("/api/login", payload);
             }
 
-            // Backend success response handle karna
+            // Success handling
             if (res.data) {
-                // Backend token aur user bhej raha hai
+                // Token aur User Info save karna
                 localStorage.setItem("userInfo", JSON.stringify(res.data.user || res.data.newuser));
                 localStorage.setItem("token", res.data.token);
                 
                 alert(res.data.message || "Success!");
 
-                const hasCompletedOnboarding = localStorage.getItem("onboarding-complete");
-                if (hasCompletedOnboarding) {
-                    navigate("/chat");
-                } else {
-                    navigate("/onboarding");
-                }
+                // Onboarding skip karke seedha chat par bhej rahe hain
+                navigate("/chat"); 
             }
         } catch (err) {
-            // Yahan 400 error ki exact wajah dikhegi console mein
             console.error("Auth Error Detail:", err.response?.data);
             alert(err.response?.data?.message || "Invalid OTP or Server Error!");
         }
