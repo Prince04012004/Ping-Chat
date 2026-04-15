@@ -1,6 +1,6 @@
 import User from "../models/User.js";
 import jwt from "jsonwebtoken";
-import sendEmail from "../utils/sendEmail.js";
+import sendEmail from "../config/utils.js";
 
 let otpStore = {};
 
