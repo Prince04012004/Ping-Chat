@@ -2,11 +2,11 @@ import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 const courierPkg = require("@trycourier/courier");
 
-// This line handles all possible export structures (v4, v5, and v6+)
 const CourierClient = courierPkg.CourierClient || courierPkg.default?.CourierClient || courierPkg;
 
+// Explicitly passing the apiKey to fix the "missing environment variable" error
 const courier = new CourierClient({ 
-  authorizationToken: process.env.COURIER_AUTH_TOKEN 
+  apiKey: process.env.COURIER_AUTH_TOKEN 
 });
 
 const sendEmail = async (email, otp) => {
