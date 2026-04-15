@@ -1,4 +1,4 @@
-import Courier from "@trycourier/courier";
+import { CourierClient } from "@trycourier/courier";
 
 const sendEmail = async (email, otp) => {
   const apiKey = process.env.COURIER_AUTH_TOKEN || process.env.COURIER_API_KEY;
@@ -7,23 +7,26 @@ const sendEmail = async (email, otp) => {
     throw new Error("Server configuration error. Please check API keys.");
   }
 
-  const courier = new Courier({ authorizationToken: apiKey });
+  const courier = CourierClient({ authorizationToken: apiKey });
 
   try {
     const { requestId } = await courier.send({
       message: {
         to: { email },
-        template: undefined,
         content: {
           title: "Ping AI - Verification Code",
           body: `Your verification code is: ${otp}. Valid for 10 minutes.`,
         },
+        routing: {
+          method: "single",
+          channels: ["email"],
+        },
       },
     });
 
-    console.log("OTP Sent Successfully! ID:", requestId);
+    console.log("OTP Sent! ID:", requestId);
   } catch (error) {
-    console.error("Courier Service Error:", error.message);
+    console.error("Courier Error:", error.message);
     throw new Error("Failed to send OTP. Please try again later.");
   }
 };
