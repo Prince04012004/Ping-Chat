@@ -1,15 +1,23 @@
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
-const Courier = require("@trycourier/courier");
 
-// Is logic se hum package ka sahi constructor nikaal lenge bina error ke
-const CourierClient = Courier.CourierClient || (Courier.default && Courier.default.CourierClient) || Courier;
+// Isse 'SyntaxError: does not provide an export named CourierClient' kabhi nahi aayega
+const CourierPkg = require("@trycourier/courier");
 
-const courier = new CourierClient({ 
-  authorizationToken: process.env.COURIER_AUTH_TOKEN 
-});
+// Isse 'TypeError: CourierClient is not a constructor' fix ho jayega
+const CourierClient = CourierPkg.CourierClient || (CourierPkg.default && CourierPkg.default.CourierClient) || CourierPkg;
 
 const sendEmail = async (email, otp) => {
+  // Check if API key exists in environment
+  const apiKey = process.env.COURIER_AUTH_TOKEN || process.env.COURIER_API_KEY;
+  
+  if (!apiKey) {
+    console.error("Critical Error: Courier API Key is missing in Render Environment Variables.");
+    throw new Error("Email configuration missing");
+  }
+
+  const courier = new CourierClient({ authorizationToken: apiKey });
+
   try {
     const { requestId } = await courier.send({
       message: {
@@ -27,7 +35,7 @@ const sendEmail = async (email, otp) => {
 
     console.log("Email sent successfully! ID:", requestId);
   } catch (error) {
-    console.error("Courier Error:", error.message);
+    console.error("Courier Service Error:", error.message);
     throw new Error("Email service failed");
   }
 };
