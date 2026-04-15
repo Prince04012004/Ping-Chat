@@ -1,35 +1,48 @@
 import mongoose from "mongoose";
+import bcrypt from "bcryptjs";
 
-const Userschema =new mongoose.Schema({
-
-    phonenumber:{
-        type:String,
-        required:true,
-        unique:true
+const Userschema = new mongoose.Schema({
+    name: {
+        type: String,
+        required: true
     },
-    name:{
-        type:String,
-        required:true
+    email: {
+        type: String,
+        required: true,
+        unique: true
     },
-    profilepic:{
-        type:String,
-        default:""
+    password: {
+        type: String,
+        required: true
     },
-    isOnline:{
-        type:Boolean,
-        default:false
+    profilepic: {
+        type: String,
+        default: ""
     },
-    status:{
-        type:String,
-        default:"Hey i am using chatbox"
+    isOnline: {
+        type: Boolean,
+        default: false
     },
-    blockedusers:[{
-        
-            type: mongoose.Schema.Types.ObjectId,
-            ref:"User"
-        
+    status: {
+        type: String,
+        default: "Hey i am using chatbox"
+    },
+    blockedusers: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User"
     }]
+}, { timestamps: true });
 
+Userschema.methods.matchPassword = async function (enteredPassword) {
+    return await bcrypt.compare(enteredPassword, this.password);
+};
 
-},{timestamps:true})
-export default mongoose.model("User",Userschema);
+Userschema.pre("save", async function (next) {
+    if (!this.isModified("password")) {
+        next();
+    }
+    const salt = await bcrypt.genSalt(10);
+    this.password = await bcrypt.hash(this.password, salt);
+});
+
+export default mongoose.model("User", Userschema);

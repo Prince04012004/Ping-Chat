@@ -1,20 +1,18 @@
 import React, { useState, useEffect } from "react";
 import API from "../services/api"; 
 import { useNavigate } from 'react-router-dom';
-import { auth } from "../firebaseConfig";
-import { RecaptchaVerifier, signInWithPhoneNumber } from "firebase/auth";
 
 const Auth = () => {
-    const [phonenumber, setphonenumber] = useState("");
-    const [otp, setotp] = useState("");
-    const [name, setname] = useState("");
+    const [email, setEmail] = useState("");
+    const [password, setPassword] = useState("");
+    const [otp, setOtp] = useState("");
+    const [name, setName] = useState("");
     const [step, setStep] = useState(1); 
     const [isSignup, setIsSignup] = useState(false); 
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
     const navigate = useNavigate();
 
-    // 1. Agar user pehle se login hai toh seedha chat par bhej do
     useEffect(() => {
         const userInfo = localStorage.getItem("userInfo");
         if (userInfo) {
@@ -22,75 +20,58 @@ const Auth = () => {
         }
     }, [navigate]);
 
-    const onCaptchVerify = () => {
-        if (!window.recaptchaVerifier) {
-            window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
-                'size': 'invisible',
-                'callback': () => { console.log("Recaptcha verified"); }
-            });
-        }
-    }
-
-    const handlesendotp = async () => {
+    const handleAction = async () => {
         setError("");
-        if (!phonenumber) return setError("Phone number is required!");
-        if (isSignup && !name) return setError("Name is required for Signup!");
-
+        if (!email || !password) return setError("Email and Password are required!");
+        
         setLoading(true);
         try {
-            onCaptchVerify();
-            const appVerifier = window.recaptchaVerifier;
-            const formatPh = phonenumber.startsWith('+') ? phonenumber : "+91" + phonenumber;
-
-            const confirmationResult = await signInWithPhoneNumber(auth, formatPh, appVerifier);
-            window.confirmationResult = confirmationResult;
-            
-            setStep(2); 
+            if (isSignup) {
+                if (!name) {
+                    setError("Name is required!");
+                    setLoading(false);
+                    return;
+                }
+                // Pehle OTP bhejenge signup ke liye
+                await API.post("/api/sendotp", { email });
+                setStep(2); 
+            } else {
+                // Direct login call
+                const res = await API.post("/api/login", { email, password });
+                if (res.data) {
+                    localStorage.setItem("userInfo", JSON.stringify(res.data.user));
+                    localStorage.setItem("token", res.data.token);
+                    navigate("/chat", { replace: true });
+                }
+            }
         } catch (err) {
-            console.error("Firebase Send Error:", err);
-            setError("Error sending OTP. Please check your number.");
+            setError(err.response?.data?.message || "Something went wrong!");
         } finally {
             setLoading(false);
         }
-    }
+    };
 
-    const handlesubmit = async () => {
+    const handleVerifySignup = async () => {
         setError("");
         if (!otp) return setError("Please enter the OTP");
 
         setLoading(true);
         try {
-            const result = await window.confirmationResult.confirm(otp);
-            const user = result.user;
-
-            let res;
-            const payload = { phonenumber };
-
-            if (isSignup) {
-                res = await API.post("/api/signup", { ...payload, name });
-            } else {
-                res = await API.post("/api/login", payload);
-            }
-
+            const res = await API.post("/api/signup", { name, email, password, otp });
             if (res.data) {
-                localStorage.setItem("userInfo", JSON.stringify(res.data.user || res.data.newuser));
+                localStorage.setItem("userInfo", JSON.stringify(res.data.user));
                 localStorage.setItem("token", res.data.token);
-                
-                // 2. Navigation ko "replace" kar diya taaki history mein Auth na rahe
                 navigate("/chat", { replace: true }); 
             }
         } catch (err) {
-            console.error("Verification Error:", err);
             setError(err.response?.data?.message || "Invalid OTP or Server Error");
         } finally {
             setLoading(false);
         }
-    }
+    };
 
     return (
         <div className="min-h-screen w-full flex items-center justify-center bg-[#0d1117] relative overflow-hidden font-sans p-4">
-            <div id="recaptcha-container"></div>
-
             <div className="relative w-full max-w-[420px] z-10">
                 <div className="bg-white/[0.03] backdrop-blur-[30px] border border-white/10 p-6 md:p-10 rounded-[32px] shadow-2xl">
                     
@@ -99,7 +80,7 @@ const Auth = () => {
                             {step === 1 ? (isSignup ? "Create Account" : "Welcome Back") : "Verification"}
                         </h1>
                         <p className="text-zinc-500 text-sm">
-                            {step === 1 ? "Enter details to continue." : "Enter the 6-digit code."}
+                            {step === 1 ? "Enter details to continue." : "Enter the code sent to your email."}
                         </p>
                     </div>
 
@@ -129,24 +110,31 @@ const Auth = () => {
                                         className="w-full bg-white/[0.04] border border-white/10 rounded-xl px-5 py-4 text-white outline-none focus:border-emerald-500/50"
                                         placeholder="Full Name" 
                                         value={name}
-                                        onChange={(e) => setname(e.target.value)}
+                                        onChange={(e) => setName(e.target.value)}
                                     />
                                 )}
                                 <input 
-                                    type="tel" 
+                                    type="email" 
                                     className="w-full bg-white/[0.04] border border-white/10 rounded-xl px-5 py-4 text-white outline-none focus:border-emerald-500/50"
-                                    placeholder="Phone Number" 
-                                    value={phonenumber}
-                                    onChange={(e) => setphonenumber(e.target.value)}
+                                    placeholder="Email Address" 
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                />
+                                <input 
+                                    type="password" 
+                                    className="w-full bg-white/[0.04] border border-white/10 rounded-xl px-5 py-4 text-white outline-none focus:border-emerald-500/50"
+                                    placeholder="Password" 
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
                                 />
                             </div>
 
                             <button 
-                                onClick={handlesendotp} 
+                                onClick={handleAction} 
                                 disabled={loading}
                                 className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 text-black font-bold rounded-xl disabled:opacity-50 transition-all"
                             >
-                                {loading ? "Sending..." : "Continue"}
+                                {loading ? "Processing..." : isSignup ? "Send OTP" : "Login"}
                             </button>
                         </div>
                     ) : (
@@ -157,19 +145,19 @@ const Auth = () => {
                                 placeholder="000000" 
                                 maxLength="6"
                                 value={otp}
-                                onChange={(e) => setotp(e.target.value)}
+                                onChange={(e) => setOtp(e.target.value)}
                             />
 
                             <button 
-                                onClick={handlesubmit} 
+                                onClick={handleVerifySignup} 
                                 disabled={loading}
                                 className="w-full py-4 bg-white text-black font-bold rounded-xl disabled:opacity-50 transition-all"
                             >
-                                {loading ? "Verifying..." : "Verify & Login"}
+                                {loading ? "Verifying..." : "Verify & Register"}
                             </button>
                             
                             <p className="text-center text-xs text-zinc-500 cursor-pointer" onClick={() => setStep(1)}>
-                                Edit Phone Number?
+                                Edit Email/Details?
                             </p>
                         </div>
                     )}
