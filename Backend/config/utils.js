@@ -1,6 +1,7 @@
-import { CourierClient } from "@trycourier/courier";
+import { createRequire } from "module";
+const require = createRequire(import.meta.url);
+const { CourierClient } = require("@trycourier/courier");
 
-// Direct initialize karo, ye sabse safe tarika hai v6+ ke liye
 const courier = new CourierClient({ 
   authorizationToken: process.env.COURIER_AUTH_TOKEN 
 });
