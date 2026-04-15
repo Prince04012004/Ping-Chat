@@ -13,7 +13,6 @@ const ProfileModal = ({ isOpen, onClose, user: passedUser }) => {
   const accentColor = config?.accent || "#10b981";
   const appRadius = config?.radius || "32px";
 
-  // Logic to identify if it's my profile
   const isMe = passedUser?._id === (currentUser?._id || currentUser?.user?._id);
 
   useEffect(() => {
@@ -23,6 +22,12 @@ const ProfileModal = ({ isOpen, onClose, user: passedUser }) => {
       setPreviewImage(passedUser.profilepic || passedUser.pic || "");
     }
   }, [isOpen, passedUser]);
+
+  // 🗑️ DELETE/REMOVE IMAGE LOGIC
+  const removeImage = (e) => {
+    e.stopPropagation(); // Taaki click niche input trigger na kare
+    setPreviewImage(""); 
+  };
 
   const postDetails = (pics) => {
     setUploading(true);
@@ -67,7 +72,6 @@ const ProfileModal = ({ isOpen, onClose, user: passedUser }) => {
     if (!isMe || uploading) return;
 
     try {
-      // FIX: Token nikalne ka robust tarika
       const token = currentUser?.token || localStorage.getItem("token");
 
       if (!token) {
@@ -78,25 +82,23 @@ const ProfileModal = ({ isOpen, onClose, user: passedUser }) => {
       const configReq = {
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`, // Yahan space aur token check confirm hai
+          Authorization: `Bearer ${token}`,
         },
       };
 
       const { data } = await API.put("/api/updateprofile", { 
         name, 
         status, 
-        profilepic: previewImage 
+        profilepic: previewImage // Ab ye empty string jayegi agar delete kiya toh
       }, configReq);
       
-      // Backend se aa rahe data ko handle karna
       const freshData = data.user || data;
       
-      // Context aur LocalStorage ko update karna
       const updatedUserInfo = { 
         ...currentUser, 
         ...freshData,
         user: freshData, 
-        token: token // Token ko preserve rakhna zaroori hai
+        token: token 
       };
 
       localStorage.setItem("userInfo", JSON.stringify(updatedUserInfo));
@@ -131,13 +133,13 @@ const ProfileModal = ({ isOpen, onClose, user: passedUser }) => {
           <h2 className="text-[10px] font-black uppercase tracking-[4px]" style={{ color: accentColor }}>
             {isMe ? "Edit My Profile" : "Identity Details"}
           </h2>
-          <button onClick={onClose} className="text-zinc-600 hover:text-white text-lg">✕</button>
+          <button onClick={onClose} className="text-zinc-600 hover:text-white text-lg transition-colors">✕</button>
         </div>
 
         <div className="p-8 flex flex-col items-center">
           <div className="relative group mb-8">
             <div 
-              className={`w-32 h-32 overflow-hidden border-2 transition-all duration-500 shadow-2xl ${isMe ? 'cursor-pointer active:scale-95' : ''}`}
+              className={`w-32 h-32 overflow-hidden border-2 transition-all duration-500 shadow-2xl relative ${isMe ? 'cursor-pointer active:scale-95' : ''}`}
               style={{ borderRadius: '32px', borderColor: hexToRGBA(accentColor, 0.3) }}
               onClick={() => isMe && document.getElementById("fileInput").click()}
             >
@@ -146,12 +148,23 @@ const ProfileModal = ({ isOpen, onClose, user: passedUser }) => {
                 className={`w-full h-full object-cover transition-all ${uploading ? 'animate-pulse opacity-40' : 'group-hover:scale-110'}`} 
                 alt="Profile" 
               />
+              
               {isMe && !uploading && (
                 <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/40">
                    <p className="text-[8px] font-bold uppercase tracking-widest text-white">Change</p>
                 </div>
               )}
             </div>
+
+            {/* 🗑️ DELETE BUTTON (Only visible to 'Me' if image exists) */}
+            {isMe && previewImage && !uploading && (
+              <button 
+                onClick={removeImage}
+                className="absolute -top-2 -right-2 bg-red-500 text-white p-2 rounded-xl shadow-lg hover:bg-red-600 transition-all z-10 active:scale-90"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18m-2 0v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6m3 0V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+              </button>
+            )}
             
             <input id="fileInput" type="file" hidden accept="image/*" onChange={(e) => postDetails(e.target.files[0])} />
             
