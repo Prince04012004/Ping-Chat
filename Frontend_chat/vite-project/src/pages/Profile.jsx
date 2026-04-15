@@ -13,6 +13,7 @@ const ProfileModal = ({ isOpen, onClose, user: passedUser }) => {
   const accentColor = config?.accent || "#10b981";
   const appRadius = config?.radius || "32px";
 
+  // Logic to identify if it's my profile
   const isMe = passedUser?._id === (currentUser?._id || currentUser?.user?._id);
 
   useEffect(() => {
@@ -23,7 +24,6 @@ const ProfileModal = ({ isOpen, onClose, user: passedUser }) => {
     }
   }, [isOpen, passedUser]);
 
-  // ☁️ CLOUDINARY UPLOAD LOGIC
   const postDetails = (pics) => {
     setUploading(true);
     if (!pics) {
@@ -32,11 +32,10 @@ const ProfileModal = ({ isOpen, onClose, user: passedUser }) => {
       return;
     }
 
-    // 🔴 IMPORTANT: 'chatapp' ya jo bhi naam tune 'Unsigned' preset ka rakha hai yahan dalo
     const CLOUD_NAME = "dtenwujnc"; 
     const UPLOAD_PRESET = "chatapp"; 
 
-    if (pics.type === "image/jpeg" || pics.type === "image/png" || pics.type === "image/jpg") {
+    if (pics.type.startsWith("image/")) {
       const data = new FormData();
       data.append("file", pics);
       data.append("upload_preset", UPLOAD_PRESET);
@@ -49,10 +48,8 @@ const ProfileModal = ({ isOpen, onClose, user: passedUser }) => {
         .then((data) => {
           if (data.secure_url) {
             setPreviewImage(data.secure_url.toString());
-            console.log("Image synced to Cloudinary:", data.secure_url);
           } else {
-            console.error("Cloudinary Error:", data);
-            alert("Upload failed! Check if your preset is 'Unsigned'.");
+            alert("Upload failed! Check Cloudinary settings.");
           }
           setUploading(false);
         })
@@ -68,11 +65,20 @@ const ProfileModal = ({ isOpen, onClose, user: passedUser }) => {
 
   const handleUpdate = async () => {
     if (!isMe || uploading) return;
+
     try {
+      // FIX: Token nikalne ka robust tarika
+      const token = currentUser?.token || localStorage.getItem("token");
+
+      if (!token) {
+        alert("Session expired. Please login again.");
+        return;
+      }
+
       const configReq = {
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${currentUser.token}`,
+          Authorization: `Bearer ${token}`, // Yahan space aur token check confirm hai
         },
       };
 
@@ -82,21 +88,25 @@ const ProfileModal = ({ isOpen, onClose, user: passedUser }) => {
         profilepic: previewImage 
       }, configReq);
       
+      // Backend se aa rahe data ko handle karna
       const freshData = data.user || data;
+      
+      // Context aur LocalStorage ko update karna
       const updatedUserInfo = { 
         ...currentUser, 
         ...freshData,
         user: freshData, 
-        token: currentUser.token 
+        token: token // Token ko preserve rakhna zaroori hai
       };
 
       localStorage.setItem("userInfo", JSON.stringify(updatedUserInfo));
-      setUser({ ...updatedUserInfo }); 
+      setUser(updatedUserInfo); 
       
       alert("Identity Updated! ⚡");
       onClose(); 
     } catch (error) {
-      alert("Update failed!");
+      console.error("Update Error:", error.response?.data || error.message);
+      alert(error.response?.data?.message || "Update failed!");
     }
   };
 
@@ -121,19 +131,19 @@ const ProfileModal = ({ isOpen, onClose, user: passedUser }) => {
           <h2 className="text-[10px] font-black uppercase tracking-[4px]" style={{ color: accentColor }}>
             {isMe ? "Edit My Profile" : "Identity Details"}
           </h2>
-          <button onClick={onClose} className="text-zinc-600 hover:text-white">✕</button>
+          <button onClick={onClose} className="text-zinc-600 hover:text-white text-lg">✕</button>
         </div>
 
         <div className="p-8 flex flex-col items-center">
           <div className="relative group mb-8">
             <div 
-              className={`w-32 h-32 overflow-hidden border-2 transition-all duration-500 shadow-2xl ${isMe ? 'cursor-pointer hover:opacity-70' : ''}`}
+              className={`w-32 h-32 overflow-hidden border-2 transition-all duration-500 shadow-2xl ${isMe ? 'cursor-pointer active:scale-95' : ''}`}
               style={{ borderRadius: '32px', borderColor: hexToRGBA(accentColor, 0.3) }}
               onClick={() => isMe && document.getElementById("fileInput").click()}
             >
               <img 
                 src={previewImage || "https://icon-library.com/images/anonymous-avatar-icon/anonymous-avatar-icon-25.jpg"} 
-                className={`w-full h-full object-cover ${uploading ? 'animate-pulse opacity-40' : ''}`} 
+                className={`w-full h-full object-cover transition-all ${uploading ? 'animate-pulse opacity-40' : 'group-hover:scale-110'}`} 
                 alt="Profile" 
               />
               {isMe && !uploading && (
@@ -146,7 +156,7 @@ const ProfileModal = ({ isOpen, onClose, user: passedUser }) => {
             <input id="fileInput" type="file" hidden accept="image/*" onChange={(e) => postDetails(e.target.files[0])} />
             
             {uploading && (
-                <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-white text-black text-[7px] font-black px-3 py-1 rounded-full tracking-widest">
+                <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-white text-black text-[7px] font-black px-3 py-1 rounded-full tracking-widest shadow-xl">
                   SYNCING...
                 </div>
             )}
@@ -158,7 +168,7 @@ const ProfileModal = ({ isOpen, onClose, user: passedUser }) => {
                 <input 
                   value={name} 
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full bg-white/5 border border-white/5 rounded-2xl px-5 py-3 text-center text-lg font-black text-white focus:border-white/20 outline-none"
+                  className="w-full bg-white/5 border border-white/5 rounded-2xl px-5 py-3 text-center text-lg font-black text-white focus:border-white/20 outline-none transition-all"
                   placeholder="Your Name"
                 />
                 <input 
@@ -170,7 +180,7 @@ const ProfileModal = ({ isOpen, onClose, user: passedUser }) => {
               </div>
             ) : (
               <div className="space-y-1">
-                <h3 className="text-xl font-black text-white">{name}</h3>
+                <h3 className="text-xl font-black text-white tracking-tight">{name}</h3>
                 <p className="text-sm text-zinc-500 italic">"{status || "No bio yet"}"</p>
               </div>
             )}
@@ -180,8 +190,14 @@ const ProfileModal = ({ isOpen, onClose, user: passedUser }) => {
                  <button 
                     onClick={handleUpdate} 
                     disabled={uploading}
-                    className="w-full py-4 uppercase tracking-[4px] text-[10px] font-black transition-all active:scale-95"
-                    style={{ backgroundColor: accentColor, color: '#000', borderRadius: '16px', opacity: uploading ? 0.4 : 1 }}
+                    className="w-full py-4 uppercase tracking-[4px] text-[10px] font-black transition-all active:scale-95 shadow-lg"
+                    style={{ 
+                      backgroundColor: accentColor, 
+                      color: '#000', 
+                      borderRadius: '16px', 
+                      opacity: uploading ? 0.4 : 1,
+                      boxShadow: `0 10px 30px ${hexToRGBA(accentColor, 0.2)}`
+                    }}
                   >
                     {uploading ? "Uploading Image..." : "Commit Changes"}
                  </button>
