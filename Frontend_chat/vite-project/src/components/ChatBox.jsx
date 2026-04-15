@@ -4,7 +4,8 @@ import API from "../services/api";
 import ProfileModal from "../pages/Profile";
 
 const ChatBox = () => {
-  const { selectedChat, setSelectedChat, user, config, hexToRGBA } = ChatState();
+  // --- TERA ORIGINAL STATE & CONTEXT ---
+  const { selectedChat, setSelectedChat, user, setUser, config, hexToRGBA, chats, setChats } = ChatState();
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
   const [showMenu, setShowMenu] = useState(false);
@@ -82,23 +83,22 @@ const ChatBox = () => {
       style={{ 
         backgroundColor: '#050505', 
         fontFamily: config?.font, 
-        height: '100dvh',
-        // --- ADDED: Subtle Background Pattern based on accent color ---
+        height: '100dvh', // Forced height for mobile frame
         backgroundImage: `radial-gradient(${hexToRGBA(accentColor, 0.04)} 1px, transparent 1px)`,
-        backgroundSize: '20px 20px'
+        backgroundSize: '24px 24px'
       }}
     >
       <ProfileModal isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)} user={profileUser} />
 
       {selectedChat ? (
-        <div className="flex flex-col h-full relative z-10">
+        <div className="flex flex-col h-full w-full relative overflow-hidden">
 
-          {/* ── FIXED HEADER (FIXED: Sticky and Z-Index) ── */}
+          {/* ── HEADER (TERA STYLE - Fixed Frame) ── */}
           <div
-            className="sticky top-0 w-full flex items-center justify-between px-4 py-3 bg-black/90 backdrop-blur-2xl border-b border-white/10 z-[120] flex-shrink-0 shadow-2xl"
+            className="flex-shrink-0 w-full flex items-center justify-between px-4 py-3 bg-black/90 backdrop-blur-2xl border-b border-white/10 z-[120] shadow-2xl"
             style={{ paddingTop: 'max(env(safe-area-inset-top), 12px)' }}
           >
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 min-w-0">
               <button onClick={() => setSelectedChat(null)} className="p-1 -ml-1 rounded-full md:hidden flex-shrink-0" style={{ color: accentColor }}>
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="m15 18-6-6 6-6" /></svg>
               </button>
@@ -118,9 +118,9 @@ const ChatBox = () => {
             <button onClick={() => setShowMenu(!showMenu)} className="p-2 text-zinc-500"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><circle cx="12" cy="12" r="1" /><circle cx="12" cy="5" r="1" /><circle cx="12" cy="19" r="1" /></svg></button>
           </div>
 
-          {/* ── MESSAGES (Scrollable) ── */}
+          {/* ── MESSAGES (TERA STYLE - Scrollable) ── */}
           <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col custom-scrollbar relative z-0">
-            <div className="flex-grow" /> {/* Push messages to bottom */}
+            <div className="flex-grow" /> 
             <div className="space-y-4">
               {messages.map((m) => {
                 const isMine = (m.sender?._id || m.sender?.id || m.sender) === (user?.user?._id || user?._id);
@@ -144,19 +144,18 @@ const ChatBox = () => {
             </div>
           </div>
 
-          {/* ── INPUT BAR ── */}
+          {/* ── INPUT BAR (TERA STYLE - Fixed Bottom) ── */}
           <div className="flex-shrink-0 px-4 py-3 bg-black/80 backdrop-blur-xl border-t border-white/5 z-20" style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 15px)' }}>
             <div className="flex items-center gap-2 bg-white/[0.05] border border-white/10 pl-4 pr-1.5 py-1.5 rounded-[28px] backdrop-blur-3xl shadow-inner">
               <input
                 ref={inputRef}
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendMessage()}
+                onKeyDown={(e) => e.key === "Enter" && sendMessage()}
                 placeholder="Message..."
                 className="flex-1 bg-transparent outline-none text-sm text-white py-2"
-                style={{ minHeight: '36px' }}
               />
-              <button onClick={sendMessage} disabled={!newMessage.trim()} className="w-10 h-10 flex items-center justify-center rounded-full flex-shrink-0 transition-all active:scale-95 disabled:opacity-20" style={{ backgroundColor: accentColor, color: '#000' }}>
+              <button onClick={sendMessage} className="w-10 h-10 flex items-center justify-center rounded-full flex-shrink-0" style={{ backgroundColor: accentColor, color: '#000' }}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5"><path d="m22 2-7 20-4-9-9-4Z" /><path d="M22 2 11 13" /></svg>
               </button>
             </div>
