@@ -1,8 +1,12 @@
-import { CourierClient } from "@trycourier/courier";
+import { createRequire } from "module";
+const require = createRequire(import.meta.url);
+const Courier = require("@trycourier/courier");
 
-// Explicitly setting the key and using 'apiKey' property
+// Is logic se hum package ka sahi constructor nikaal lenge bina error ke
+const CourierClient = Courier.CourierClient || (Courier.default && Courier.default.CourierClient) || Courier;
+
 const courier = new CourierClient({ 
-  apiKey: process.env.COURIER_AUTH_TOKEN 
+  authorizationToken: process.env.COURIER_AUTH_TOKEN 
 });
 
 const sendEmail = async (email, otp) => {
