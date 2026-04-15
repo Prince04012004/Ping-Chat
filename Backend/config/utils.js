@@ -4,7 +4,6 @@ const sendEmail = async (email, otp) => {
   const apiKey = process.env.COURIER_AUTH_TOKEN || process.env.COURIER_API_KEY;
 
   if (!apiKey) {
-    console.error("Backend Error: COURIER_AUTH_TOKEN is missing in Render Environment Variables.");
     throw new Error("Server configuration error. Please check API keys.");
   }
 
@@ -13,14 +12,11 @@ const sendEmail = async (email, otp) => {
   try {
     const { requestId } = await courier.send({
       message: {
-        to: { email: email },
+        to: { email },
+        template: undefined,
         content: {
           title: "Ping AI - Verification Code",
-          body: `Welcome to Ping AI! Your verification code is: ${otp}. This code is valid for 10 minutes.`,
-        },
-        routing: {
-          method: "single",
-          channels: ["email"],
+          body: `Your verification code is: ${otp}. Valid for 10 minutes.`,
         },
       },
     });
