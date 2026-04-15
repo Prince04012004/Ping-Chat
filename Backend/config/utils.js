@@ -1,21 +1,19 @@
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
-
-// Isse 'SyntaxError: does not provide an export named CourierClient' kabhi nahi aayega
 const CourierPkg = require("@trycourier/courier");
 
-// Isse 'TypeError: CourierClient is not a constructor' fix ho jayega
 const CourierClient = CourierPkg.CourierClient || (CourierPkg.default && CourierPkg.default.CourierClient) || CourierPkg;
 
 const sendEmail = async (email, otp) => {
-  // Check if API key exists in environment
+  // 1. Check if the key exists (using both common names)
   const apiKey = process.env.COURIER_AUTH_TOKEN || process.env.COURIER_API_KEY;
-  
+
   if (!apiKey) {
-    console.error("Critical Error: Courier API Key is missing in Render Environment Variables.");
-    throw new Error("Email configuration missing");
+    console.error("Backend Error: COURIER_AUTH_TOKEN is missing in Render Environment Variables.");
+    throw new Error("Server configuration error. Please check API keys.");
   }
 
+  // 2. Initialize inside the function to ensure it has the latest env values
   const courier = new CourierClient({ authorizationToken: apiKey });
 
   try {
@@ -33,10 +31,11 @@ const sendEmail = async (email, otp) => {
       },
     });
 
-    console.log("Email sent successfully! ID:", requestId);
+    console.log("OTP Sent Successfully! ID:", requestId);
   } catch (error) {
     console.error("Courier Service Error:", error.message);
-    throw new Error("Email service failed");
+    // Custom message for frontend
+    throw new Error("Failed to send OTP. Please try again later.");
   }
 };
 
