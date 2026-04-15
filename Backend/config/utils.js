@@ -1,11 +1,10 @@
 import courierPkg from "@trycourier/courier";
 
-// 1. SyntaxError bypass karne ke liye safe import
+// 1. Precise extraction for v6+ and v7+
 const CourierClient = courierPkg.CourierClient || courierPkg.default?.CourierClient || courierPkg;
 
-// 2. Client initialize karo (apiKey use karke)
 const courier = new CourierClient({ 
-  apiKey: process.env.COURIER_AUTH_TOKEN 
+  authorizationToken: process.env.COURIER_AUTH_TOKEN 
 });
 
 const sendEmail = async (email, otp) => {
@@ -24,20 +23,24 @@ const sendEmail = async (email, otp) => {
       },
     };
 
-    // 3. HYBRID CHECK: Check if method is .send or .messages.send
-    // Ye line decide karegi ki kaunsa method work karega
+    /**
+     * TRICK: Courier v6+ uses nested 'send' if initialized this way.
+     * We attempt multiple common access patterns.
+     */
     let response;
-    if (typeof courier.send === 'function') {
-      response = await courier.send(messagePayload);
+    
+    if (courier.send && typeof courier.send === 'function') {
+        response = await courier.send(messagePayload);
     } else if (courier.messages && typeof courier.messages.send === 'function') {
-      response = await courier.messages.send(messagePayload);
+        response = await courier.messages.send(messagePayload);
     } else {
-      throw new Error("Courier SDK methods not found. Try updating the package.");
+        // Last resort: some versions require calling it like this
+        response = await courier.send.messages(messagePayload);
     }
 
     console.log("Email sent successfully! ID:", response.requestId || response.messageId);
   } catch (error) {
-    console.error("Courier Error:", error.message);
+    console.error("Courier Error Detail:", error.message);
     throw new Error("Email service failed");
   }
 };
