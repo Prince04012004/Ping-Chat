@@ -1,6 +1,8 @@
-import { CourierClient } from "@trycourier/courier";
+import { createRequire } from "module";
+const require = createRequire(import.meta.url);
+const { CourierClient } = require("@trycourier/courier");
 
-// We use 'authorizationToken' as the key name for the SDK
+// Initialize Courier
 const courier = new CourierClient({ 
   authorizationToken: process.env.COURIER_AUTH_TOKEN 
 });
