@@ -3,6 +3,7 @@ import API from "../services/api";
 import { ChatState } from "../Context/ChatProvider";
 import BlockedModal from "./BlockedModal"; 
 import ProfileModal from "../pages/Profile";
+import { useNavigate } from 'react-router-dom';
 
 const Mychats = () => {
   const [search, setsearch] = useState("");
@@ -15,6 +16,8 @@ const Mychats = () => {
   const [showCustomizer, setShowCustomizer] = useState(false);
   const [aiPrompt, setAiPrompt] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
+
+  const navigate = useNavigate();
 
   const { 
     setSelectedChat, 
@@ -47,15 +50,11 @@ const Mychats = () => {
     localStorage.setItem("user-config", JSON.stringify(config));
   }, [config.font, config.accent]);
 
-  // 🔥 FIXED: generateAITheme function
   const generateAITheme = async () => {
     if (!aiPrompt.trim()) return;
     try {
       setAiLoading(true);
-      
-      // Safety check for token
       const token = user?.token || localStorage.getItem("token");
-      
       const { data } = await API.post(
         "/api/ai/generate-theme", 
         { prompt: aiPrompt }, 
@@ -74,8 +73,6 @@ const Mychats = () => {
           texture_url: data.texture_url || '' 
         });
         setAiPrompt("");
-        // Theme update hone par customizer close karna ho toh niche wali line uncomment kar dena
-        // setShowCustomizer(false); 
       }
     } catch (error) {
       console.error("AI Theme Error:", error.response?.data || error.message);
@@ -140,6 +137,12 @@ const Mychats = () => {
     } catch (e) { return `rgba(255, 255, 255, ${alpha})`; }
   };
 
+  const handleLogout = () => {
+    localStorage.removeItem("userInfo");
+    localStorage.removeItem("token");
+    navigate("/", { replace: true });
+  };
+
   const finalPattern = config.texture_url ? `url('${config.texture_url}')` : themePresets[config.font]?.pattern;
 
   return (
@@ -158,33 +161,21 @@ const Mychats = () => {
       <div className="absolute inset-0 pointer-events-none transition-all duration-1000 z-0"
         style={{ backgroundImage: finalPattern, backgroundRepeat: 'repeat', backgroundSize: '180px', opacity: 0.04 }} />
 
-      {/* --- GLITTER BACKGROUND EFFECT --- */}
-      <style>{`
-        @keyframes twinkling {
-          0%, 100% { opacity: 0.2; transform: scale(0.8); }
-          50% { opacity: 1; transform: scale(1.1); }
-        }
-        .glitter-star {
-          position: absolute;
-          width: 2px;
-          height: 2px;
-          background: white;
-          border-radius: 50%;
-          animation: twinkling var(--duration) infinite;
-        }
-      `}</style>
-
+      {/* Glitter Stars Effect */}
       <div className="absolute inset-0 pointer-events-none z-0">
         {[...Array(25)].map((_, i) => (
           <div 
             key={i} 
             className="glitter-star" 
             style={{ 
+              position: 'absolute',
+              width: '2px', height: '2px',
               top: `${Math.random() * 100}%`, 
               left: `${Math.random() * 100}%`, 
-              '--duration': `${2 + Math.random() * 3}s`,
               backgroundColor: config.accent || '#fff',
-              boxShadow: `0 0 8px ${config.accent || '#fff'}`
+              boxShadow: `0 0 8px ${config.accent || '#fff'}`,
+              borderRadius: '50%',
+              opacity: 0.6
             }} 
           />
         ))}
@@ -210,6 +201,11 @@ const Mychats = () => {
             </div>
 
             <div className="flex items-center gap-2 md:gap-3">
+              {/* Logout Button */}
+              <button title="Logout" onClick={handleLogout} className="p-2.5 rounded-xl transition-all hover:bg-red-500/10 text-zinc-500 hover:text-red-500">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+              </button>
+
               <button title="Privacy" onClick={() => setIsBlockedModalOpen(true)} className="p-2.5 rounded-xl transition-all hover:bg-white/5 text-zinc-500">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
               </button>
@@ -219,36 +215,6 @@ const Mychats = () => {
               </button>
             </div>
           </div>
-
-          {showCustomizer && (
-            <div className="mb-6 p-5 bg-[#0f0f0f]/90 backdrop-blur-2xl border border-white/5 rounded-3xl animate-in zoom-in duration-300 max-h-[400px] overflow-y-auto custom-scrollbar">
-              <div className="space-y-6">
-                <div>
-                  <label className="text-[9px] font-black uppercase text-zinc-500 tracking-[0.2em] mb-3 block">AI Visual Engine</label>
-                  <div className="flex gap-2">
-                    <input value={aiPrompt} onChange={(e) => setAiPrompt(e.target.value)} placeholder="Cyberpunk..." 
-                      className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white outline-none focus:border-white/20" />
-                    <button onClick={generateAITheme} disabled={aiLoading} className="px-4 py-2 rounded-xl text-[9px] font-black uppercase bg-white text-black transition-all active:scale-95">
-                      {aiLoading ? '...' : 'Gen'}
-                    </button>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-[9px] font-black uppercase text-zinc-500 tracking-[0.2em] mb-3 block">Typography</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {Object.keys(themePresets).map((font) => (
-                      <button key={font} onClick={() => setConfig({ ...config, font: font, texture_url: '' })}
-                        className={`px-3 py-2.5 rounded-xl text-[10px] border transition-all ${config.font === font ? 'border-white text-white' : 'border-white/5 text-zinc-500 hover:border-white/20'}`}
-                        style={{ fontFamily: font }}>
-                        {font.split(',')[0].replace(/'/g, '')}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
 
           <input type="text" placeholder="Search decrypted chats..." value={search} onChange={(e) => handleSearch(e.target.value)} 
             className="w-full bg-[#0f0f0f] border border-white/5 rounded-2xl px-5 py-3.5 text-sm text-white outline-none focus:border-white/20 transition-all font-medium" />
