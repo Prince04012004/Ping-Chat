@@ -1,25 +1,18 @@
-import nodemailer from "nodemailer";
+import { Resend } from "resend";
 
 const sendEmail = async (email, otp) => {
-  const transporter = nodemailer.createTransport({
-    host: "smtp.gmail.com",
-    port: 587,
-    secure: false,
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
-    },
-  });
+  const resend = new Resend(process.env.RESEND_API_KEY);
 
   try {
-    await transporter.sendMail({
-      from: `"Ping AI" <${process.env.EMAIL_USER}>`,
+    const { data, error } = await resend.emails.send({
+      from: "Ping AI <onboarding@resend.dev>",
       to: email,
       subject: "Ping AI - Verification Code",
       html: `<h2>Your OTP is: <b>${otp}</b></h2><p>Valid for 10 minutes.</p>`,
     });
 
-    console.log("OTP Sent Successfully to:", email);
+    if (error) throw new Error(error.message);
+    console.log("OTP Sent Successfully! ID:", data.id);
   } catch (error) {
     console.error("Email Error:", error.message);
     throw new Error("Failed to send OTP. Please try again later.");
