@@ -1,4 +1,7 @@
-import { CourierClient } from "@trycourier/courier";
+import Courier from "@trycourier/courier";
+
+// Library ko as a default import liya hai taaki SyntaxError na aaye
+const CourierClient = Courier.CourierClient || Courier.default?.CourierClient || Courier;
 
 const courier = new CourierClient({ 
   authorizationToken: process.env.COURIER_AUTH_TOKEN 
@@ -6,13 +9,12 @@ const courier = new CourierClient({
 
 const sendEmail = async (email, otp) => {
   try {
-    // Basic message object
     const messagePayload = {
       message: {
         to: { email: email },
         content: {
           title: "Ping AI - Verification Code",
-          body: `Your verification code is: ${otp}. Valid for 10 minutes.`,
+          body: `Your verification code is: ${otp}. This code is valid for 10 minutes.`,
         },
         routing: {
           method: "single",
@@ -21,17 +23,16 @@ const sendEmail = async (email, otp) => {
       },
     };
 
-    // Version Check: Kuch versions mein direct .send() hota hai, kuch mein .messages.send()
-    let response;
-    if (typeof courier.send === 'function') {
-      response = await courier.send(messagePayload);
-    } else if (courier.messages && typeof courier.messages.send === 'function') {
-      response = await courier.messages.send(messagePayload);
-    } else {
-      throw new Error("Courier SDK method 'send' not found. Please check SDK version.");
+    // Yahan hum check kar rahe hain ki method kahan hai
+    const sendMethod = courier.send || (courier.messages && courier.messages.send);
+    
+    if (typeof sendMethod !== 'function') {
+      throw new Error("Courier send method not found");
     }
 
-    console.log("Email sent successfully! ID:", response.requestId || response.messageId);
+    const response = await sendMethod.call(courier, messagePayload);
+    console.log("OTP Sent! Request ID:", response.requestId || response.messageId);
+
   } catch (error) {
     console.error("Courier Error:", error.message);
     throw new Error("Email service failed");
