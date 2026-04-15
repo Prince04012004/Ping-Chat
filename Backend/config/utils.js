@@ -1,4 +1,4 @@
-import { CourierClient } from "@trycourier/courier";
+import Courier from "@trycourier/courier";
 
 const sendEmail = async (email, otp) => {
   const apiKey = process.env.COURIER_AUTH_TOKEN || process.env.COURIER_API_KEY;
@@ -8,7 +8,7 @@ const sendEmail = async (email, otp) => {
     throw new Error("Server configuration error. Please check API keys.");
   }
 
-  const courier = new CourierClient({ authorizationToken: apiKey });
+  const courier = new Courier({ authorizationToken: apiKey });
 
   try {
     const { requestId } = await courier.send({
