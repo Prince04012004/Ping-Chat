@@ -26,7 +26,7 @@ const sendEmail = async (email, otp) => {
 
     console.log("OTP Sent! ID:", requestId);
   } catch (error) {
-    console.error("Courier Error:", error.message);
+    console.error("Courier Full Error:", JSON.stringify(error.response?.data || error.message, null, 2));
     throw new Error("Failed to send OTP. Please try again later.");
   }
 };
