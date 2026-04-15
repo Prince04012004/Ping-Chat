@@ -1,7 +1,10 @@
-import { CourierClient } from "@trycourier/courier";
+import courierPkg from "@trycourier/courier";
 
-// Explicitly pass the key using the 'apiKey' property
+// SyntaxError bypass karne ke liye safe import
+const CourierClient = courierPkg.CourierClient || courierPkg.default?.CourierClient || courierPkg;
+
 const courier = new CourierClient({ 
+  // Humne yahan 'apiKey' explicitly likh diya hai taaki library khush rahe
   apiKey: process.env.COURIER_AUTH_TOKEN 
 });
 
