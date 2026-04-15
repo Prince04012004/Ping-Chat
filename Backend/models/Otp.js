@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 
 const OtpSchema = new mongoose.Schema({
-    phonenumber: {
+    email: {
         type: String,
         required: true,
     },
@@ -12,7 +12,7 @@ const OtpSchema = new mongoose.Schema({
     createdAt: {
         type: Date,
         default: Date.now,
-        index: { expires: 300 } 
+        expires: 600 // 10 minutes mein apne aap DB se delete ho jayega
     }
 });
 

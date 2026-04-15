@@ -1,41 +1,48 @@
 import User from "../models/User.js";
+import Otp from "../models/Otp.js"; // Naya model import karo
 import jwt from "jsonwebtoken";
-import sendEmail from "../config/utils.js";
+import sendEmail from "../config/utils.js"; 
 
-let otpStore = {};
-
+// 1. Send OTP (Save to separate Otp collection)
 export const sendOTP = async (req, res) => {
   try {
     const { email } = req.body;
     if (!email) return res.status(400).json({ message: "Email is required" });
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    otpStore[email] = { otp, expiresAt: Date.now() + 600000 };
 
+    // Purane OTP delete karo taaki garbage na bhare
+    await Otp.deleteMany({ email });
+
+    // DB mein save karo (Yeh ab Otp collection mein dikhega)
+    await Otp.create({ email, otp });
+
+    // Email bhejo
     await sendEmail(email, otp);
 
-    res.status(200).json({ message: "OTP sent" });
+    res.status(200).json({ message: "OTP sent and saved in DB" });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
 
+// 2. Signup (Verify from Otp collection and create User)
 export const signup = async (req, res) => {
   try {
     const { name, email, password, otp, profilepic } = req.body;
 
-    if (!otpStore[email] || otpStore[email].otp !== otp) {
-      return res.status(400).json({ message: "Invalid OTP" });
+    // Otp collection se check karo
+    const otpRecord = await Otp.findOne({ email, otp });
+
+    if (!otpRecord) {
+      return res.status(400).json({ message: "Invalid or expired OTP" });
     }
 
-    if (Date.now() > otpStore[email].expiresAt) {
-      delete otpStore[email];
-      return res.status(400).json({ message: "OTP expired" });
-    }
-
+    // Check if user already exists
     const userexist = await User.findOne({ email });
-    if (userexist) return res.status(400).json({ message: "User exists" });
+    if (userexist) return res.status(400).json({ message: "User already exists" });
 
+    // Naya user create karo
     const newuser = await User.create({
       name,
       email,
@@ -43,7 +50,8 @@ export const signup = async (req, res) => {
       profilepic: profilepic || "",
     });
 
-    delete otpStore[email];
+    // Signup hone ke baad OTP delete kar do
+    await Otp.deleteMany({ email });
 
     const token = jwt.sign({ id: newuser._id }, process.env.JWT_SECRET, { expiresIn: "30d" });
 
@@ -61,6 +69,7 @@ export const signup = async (req, res) => {
   }
 };
 
+// 3. Login
 export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
