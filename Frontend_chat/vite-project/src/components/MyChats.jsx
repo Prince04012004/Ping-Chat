@@ -73,9 +73,12 @@ const Mychats = () => {
           texture_url: data.texture_url || '' 
         });
         setAiPrompt("");
+        // Success hone par panel band kar sakte hain
+        // setShowCustomizer(false); 
       }
     } catch (error) {
       console.error("AI Theme Error:", error.response?.data || error.message);
+      alert("AI Generation failed. Check Backend logs/API Key.");
     } finally {
       setAiLoading(false);
     }
@@ -161,26 +164,6 @@ const Mychats = () => {
       <div className="absolute inset-0 pointer-events-none transition-all duration-1000 z-0"
         style={{ backgroundImage: finalPattern, backgroundRepeat: 'repeat', backgroundSize: '180px', opacity: 0.04 }} />
 
-      {/* Glitter Stars Effect */}
-      <div className="absolute inset-0 pointer-events-none z-0">
-        {[...Array(25)].map((_, i) => (
-          <div 
-            key={i} 
-            className="glitter-star" 
-            style={{ 
-              position: 'absolute',
-              width: '2px', height: '2px',
-              top: `${Math.random() * 100}%`, 
-              left: `${Math.random() * 100}%`, 
-              backgroundColor: config.accent || '#fff',
-              boxShadow: `0 0 8px ${config.accent || '#fff'}`,
-              borderRadius: '50%',
-              opacity: 0.6
-            }} 
-          />
-        ))}
-      </div>
-
       <div className="content-wrapper relative z-10 flex flex-col h-full backdrop-blur-[1px]">
         <BlockedModal isOpen={isBlockedModalOpen} onClose={() => setIsBlockedModalOpen(false)} userToken={user?.token} fetchChats={fetchChats} blockedList={blockedList} />
         <ProfileModal isOpen={isProfileOpen} onClose={() => { setIsProfileOpen(false); setProfileUser(null); }} user={profileUser} />
@@ -201,7 +184,6 @@ const Mychats = () => {
             </div>
 
             <div className="flex items-center gap-2 md:gap-3">
-              {/* Logout Button */}
               <button title="Logout" onClick={handleLogout} className="p-2.5 rounded-xl transition-all hover:bg-red-500/10 text-zinc-500 hover:text-red-500">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
               </button>
@@ -215,6 +197,32 @@ const Mychats = () => {
               </button>
             </div>
           </div>
+
+          {/* NEW: AI Theme Customizer Panel */}
+          {showCustomizer && (
+            <div className="mb-6 p-4 rounded-3xl bg-white/5 border border-white/10 backdrop-blur-md animate-in fade-in slide-in-from-top-4 duration-300">
+              <label className="text-[10px] uppercase tracking-widest font-black opacity-40 mb-3 block" style={{ color: config.accent }}>
+                AI Theme Customizer
+              </label>
+              <div className="flex gap-2">
+                <input 
+                  type="text" 
+                  placeholder="e.g. Royal Indigo, Cyberpunk..." 
+                  value={aiPrompt}
+                  onChange={(e) => setAiPrompt(e.target.value)}
+                  className="flex-1 bg-black/40 border border-white/5 rounded-xl px-4 py-2 text-xs text-white outline-none focus:border-white/20 transition-all"
+                />
+                <button 
+                  onClick={generateAITheme}
+                  disabled={aiLoading}
+                  className="px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-tighter transition-all active:scale-95 disabled:opacity-50"
+                  style={{ backgroundColor: config.accent, color: '#000' }}
+                >
+                  {aiLoading ? "..." : "Gen"}
+                </button>
+              </div>
+            </div>
+          )}
 
           <input type="text" placeholder="Search decrypted chats..." value={search} onChange={(e) => handleSearch(e.target.value)} 
             className="w-full bg-[#0f0f0f] border border-white/5 rounded-2xl px-5 py-3.5 text-sm text-white outline-none focus:border-white/20 transition-all font-medium" />
