@@ -1,15 +1,13 @@
-import courierPkg from "@trycourier/courier";
+import { CourierClient } from "@trycourier/courier";
 
-// 1. Precise extraction for v6+ and v7+
-const CourierClient = courierPkg.CourierClient || courierPkg.default?.CourierClient || courierPkg;
-
+// Explicitly setting the key and using 'apiKey' property
 const courier = new CourierClient({ 
-  authorizationToken: process.env.COURIER_AUTH_TOKEN 
+  apiKey: process.env.COURIER_AUTH_TOKEN 
 });
 
 const sendEmail = async (email, otp) => {
   try {
-    const messagePayload = {
+    const { requestId } = await courier.send({
       message: {
         to: { email: email },
         content: {
@@ -21,26 +19,11 @@ const sendEmail = async (email, otp) => {
           channels: ["email"],
         },
       },
-    };
+    });
 
-    /**
-     * TRICK: Courier v6+ uses nested 'send' if initialized this way.
-     * We attempt multiple common access patterns.
-     */
-    let response;
-    
-    if (courier.send && typeof courier.send === 'function') {
-        response = await courier.send(messagePayload);
-    } else if (courier.messages && typeof courier.messages.send === 'function') {
-        response = await courier.messages.send(messagePayload);
-    } else {
-        // Last resort: some versions require calling it like this
-        response = await courier.send.messages(messagePayload);
-    }
-
-    console.log("Email sent successfully! ID:", response.requestId || response.messageId);
+    console.log("Email sent successfully! ID:", requestId);
   } catch (error) {
-    console.error("Courier Error Detail:", error.message);
+    console.error("Courier Error:", error.message);
     throw new Error("Email service failed");
   }
 };
