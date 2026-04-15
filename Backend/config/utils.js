@@ -1,5 +1,3 @@
-import fetch from "node-fetch";
-
 const sendEmail = async (email, otp) => {
   const apiKey = process.env.COURIER_AUTH_TOKEN || process.env.COURIER_API_KEY;
 
