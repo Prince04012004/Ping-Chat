@@ -12,7 +12,7 @@ const sendEmail = async (email, otp) => {
   try {
     const { requestId } = await courier.send({
       message: {
-        to: { email },
+        recipient: email,  // 👈 "to" ki jagah "recipient" kiya
         content: {
           title: "Ping AI - Verification Code",
           body: `Your verification code is: ${otp}. Valid for 10 minutes.`,
