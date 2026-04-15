@@ -1,32 +1,25 @@
+import nodemailer from "nodemailer";
+
 const sendEmail = async (email, otp) => {
-  const apiKey = process.env.COURIER_AUTH_TOKEN || process.env.COURIER_API_KEY;
+  const transporter = nodemailer.createTransport({
+    host: "smtp.gmail.com",
+    port: 587,
+    secure: false,
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS,
+    },
+  });
 
   try {
-    const response = await fetch("https://api.courier.com/send", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        message: {
-          to: {
-            email: email,
-          },
-          content: {
-            title: "Ping AI - Verification Code",
-            body: `Your verification code is: ${otp}. Valid for 10 minutes.`,
-          },
-          routing: {
-            method: "single",
-            channels: ["email"],
-          },
-        },
-      }),
+    await transporter.sendMail({
+      from: `"Ping AI" <${process.env.EMAIL_USER}>`,
+      to: email,
+      subject: "Ping AI - Verification Code",
+      html: `<h2>Your OTP is: <b>${otp}</b></h2><p>Valid for 10 minutes.</p>`,
     });
 
-    const data = await response.json();
-    console.log("OTP Sent! Response:", data);
+    console.log("OTP Sent Successfully to:", email);
   } catch (error) {
     console.error("Email Error:", error.message);
     throw new Error("Failed to send OTP. Please try again later.");
