@@ -16,7 +16,7 @@ const ChatBox = () => {
   const menuRef = useRef(null);
   const inputRef = useRef(null);
 
-  // --- WHATSAPP STYLE VIEWPORT FIX ---
+  // Keyboard height fix logic
   useEffect(() => {
     const handleResize = () => {
       if (window.visualViewport) {
@@ -51,9 +51,8 @@ const ChatBox = () => {
   const receiverName = receiver?.name || receiver?.username || "Aura User";
   const receiverPic = receiver?.profilepic || receiver?.pic || "";
 
-  // --- SMOOTH PROFILE OPEN (Fixes Screenshot Issue) ---
   const openProfile = async () => {
-    // 1. Keyboard band karo pehle
+    // Keyboard blur for smoothness
     if (document.activeElement instanceof HTMLElement) {
       document.activeElement.blur();
     }
@@ -66,10 +65,8 @@ const ChatBox = () => {
       setProfileUser(data);
       setShowMenu(false);
       
-      // 2. Thoda delay taaki keyboard slide down ho jaye, fir modal dikhao
-      setTimeout(() => {
-        setIsProfileOpen(true);
-      }, 100);
+      // Force modal to top by state change
+      setIsProfileOpen(true);
     } catch (err) { console.error(err); }
   };
 
@@ -107,38 +104,40 @@ const ChatBox = () => {
 
   return (
     <>
+      {/* CRITICAL FIX: ProfileModal ko yahan rakha hai aur z-index ko ensure karne ke liye 
+        iske container ko fixed aur top-most banaya hai.
+      */}
+      {isProfileOpen && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center pointer-events-auto">
+          <ProfileModal 
+            isOpen={isProfileOpen} 
+            onClose={() => setIsProfileOpen(false)} 
+            user={profileUser} 
+          />
+        </div>
+      )}
+
       <style>{`
-        /* Smooth Dark Background with Flowing Aura */
         .aura-bg {
           position: absolute;
           inset: 0;
           background: 
-            radial-gradient(circle at 0% 0%, ${hexToRGBA(accentColor, 0.08)} 0%, transparent 50%),
-            radial-gradient(circle at 100% 100%, ${hexToRGBA(accentColor, 0.05)} 0%, transparent 50%);
-          filter: blur(80px);
+            radial-gradient(circle at 10% 10%, ${hexToRGBA(accentColor, 0.1)} 0%, transparent 40%),
+            radial-gradient(circle at 90% 90%, ${hexToRGBA(accentColor, 0.07)} 0%, transparent 40%);
+          filter: blur(70px);
           z-index: 0;
           pointer-events: none;
         }
-
-        /* Message Bubble Animation */
-        .msg-pop { animation: msgPop 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
-        @keyframes msgPop {
-          from { opacity: 0; transform: translateY(10px) scale(0.95); }
-          to { opacity: 1; transform: translateY(0) scale(1); }
-        }
       `}</style>
 
-      {/* Profile Modal - Ensure it has high Z-index */}
-      <ProfileModal isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)} user={profileUser} />
-      
       <div
         id="chat-container"
-        className="fixed inset-0 z-[100] md:relative md:inset-auto md:flex md:flex-1 flex flex-col bg-[#050505] overflow-hidden"
+        className="fixed inset-0 z-[10] md:relative md:inset-auto md:flex md:flex-1 flex flex-col bg-[#050505] overflow-hidden"
         style={{ fontFamily: config?.font }}
       >
         <div className="aura-bg" />
 
-        {/* ── HEADER (WhatsApp Style Fixed) ── */}
+        {/* --- HEADER --- */}
         <div className="flex-shrink-0 w-full flex items-center justify-between px-4 py-3 bg-black/60 backdrop-blur-3xl border-b border-white/5 z-20 shadow-xl">
           <div className="flex items-center gap-3 min-w-0">
             <button onClick={() => setSelectedChat(null)} className="p-1 md:hidden" style={{ color: accentColor }}>
@@ -147,14 +146,11 @@ const ChatBox = () => {
             <div onClick={openProfile} className="flex items-center cursor-pointer gap-3 min-w-0">
               <div className="w-10 h-10 rounded-2xl border flex-shrink-0 overflow-hidden" 
                    style={{ borderColor: hexToRGBA(accentColor, 0.2), backgroundColor: '#0a0a0a' }}>
-                {receiverPic ? <img src={receiverPic} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center font-black" style={{color: accentColor}}>{receiverName.charAt(0)}</div>}
+                {receiverPic ? <img src={receiverPic} className="w-full h-full object-cover" alt="" /> : <div className="w-full h-full flex items-center justify-center font-black" style={{color: accentColor}}>{receiverName.charAt(0)}</div>}
               </div>
               <div className="min-w-0">
                 <h2 className="text-[14px] font-black text-white truncate uppercase tracking-tight leading-tight">{receiverName}</h2>
-                <div className="flex items-center gap-1.5">
-                   <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{backgroundColor: accentColor}}></span>
-                   <p className="text-[8px] font-bold opacity-40 uppercase tracking-widest">Connected</p>
-                </div>
+                <p className="text-[8px] font-bold opacity-40 uppercase tracking-widest" style={{color: accentColor}}>Encrypted</p>
               </div>
             </div>
           </div>
@@ -174,18 +170,18 @@ const ChatBox = () => {
           </div>
         </div>
 
-        {/* ── MESSAGES (Scrollable) ── */}
+        {/* --- MESSAGES --- */}
         <div className="flex-1 overflow-y-auto px-4 py-6 custom-scrollbar relative z-10 space-y-6">
           {messages.map((m) => {
             const isMine = (m.sender?._id || m.sender) === (user?.user?._id || user?._id);
             return (
-              <div key={m._id} className={`flex ${isMine ? 'justify-end' : 'justify-start'} msg-pop`}>
+              <div key={m._id} className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
                 <div className="max-w-[85%] px-4 py-3 text-[14px] leading-relaxed shadow-2xl"
                   style={{
-                    borderRadius: isMine ? '20px 20px 4px 20px' : '20px 20px 20px 4px',
-                    backgroundColor: isMine ? hexToRGBA(accentColor, 0.15) : 'rgba(255,255,255,0.03)',
+                    borderRadius: isMine ? '24px 24px 4px 24px' : '24px 24px 24px 4px',
+                    backgroundColor: isMine ? hexToRGBA(accentColor, 0.15) : 'rgba(255,255,255,0.04)',
                     color: '#fff',
-                    border: `1px solid ${isMine ? hexToRGBA(accentColor, 0.25) : 'rgba(255,255,255,0.06)'}`,
+                    border: `1px solid ${isMine ? hexToRGBA(accentColor, 0.2) : 'rgba(255,255,255,0.06)'}`,
                     backdropFilter: 'blur(20px)',
                   }}>
                   {m.content}
@@ -196,19 +192,19 @@ const ChatBox = () => {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* ── INPUT BAR (WhatsApp Style) ── */}
-        <div className="flex-shrink-0 p-4 bg-black/20 backdrop-blur-xl border-t border-white/5 z-20">
-          <div className="flex items-center gap-2 bg-white/[0.04] border border-white/5 pl-4 pr-1.5 py-1.5 rounded-[24px] shadow-inner focus-within:border-white/15 transition-all">
+        {/* --- INPUT BAR --- */}
+        <div className="flex-shrink-0 p-4 bg-black/40 backdrop-blur-xl border-t border-white/5 z-20">
+          <div className="flex items-center gap-2 bg-white/[0.03] border border-white/10 pl-4 pr-1.5 py-1.5 rounded-[24px]">
             <input
               ref={inputRef}
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && sendMessage()}
-              placeholder="Start typing..."
+              placeholder="Type message..."
               className="flex-1 bg-transparent outline-none text-[13px] text-white py-2"
             />
-            <button onClick={sendMessage} className="w-10 h-10 flex items-center justify-center rounded-full active:scale-90 transition-transform"
-                    style={{ backgroundColor: accentColor, color: '#000', boxShadow: `0 0 20px ${hexToRGBA(accentColor, 0.4)}` }}>
+            <button onClick={sendMessage} className="w-10 h-10 flex items-center justify-center rounded-full active:scale-95 transition-transform"
+                    style={{ backgroundColor: accentColor, color: '#000' }}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5"><path d="m22 2-7 20-4-9-9-4Z" /><path d="M22 2 11 13" /></svg>
             </button>
           </div>
