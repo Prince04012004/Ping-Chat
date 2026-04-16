@@ -13,29 +13,29 @@ const ChatBox = () => {
   const accentColor = config?.accent || "#10b981";
   
   const messagesEndRef = useRef(null);
-  const menuRef = useRef(null);
   const inputRef = useRef(null);
 
-  // --- THE ULTIMATE ANTI-JITTER FIX ---
+  // --- KEYBOARD & VIEWPORT LOGIC ---
   useEffect(() => {
-    const grow = () => {
+    const handleViewportChange = () => {
       if (window.visualViewport) {
-        const wrapper = document.getElementById("chat-viewport-wrapper");
-        if (wrapper) {
-          // Keyboard khulne par height adjust hogi bina page push kiye
-          wrapper.style.height = `${window.visualViewport.height}px`;
-          window.scrollTo(0, 0); 
+        const chatWrapper = document.getElementById("chat-box-wrapper");
+        if (chatWrapper) {
+          // Height ko keyboard ke bache hue area ke barabar set karna
+          chatWrapper.style.height = `${window.visualViewport.height}px`;
+          // Browser ko force karna ki wo scroll na kare
+          window.scrollTo(0, 0);
         }
       }
     };
 
-    window.visualViewport?.addEventListener("resize", grow);
-    window.visualViewport?.addEventListener("scroll", grow);
-    grow(); // Initial call
+    window.visualViewport?.addEventListener("resize", handleViewportChange);
+    window.visualViewport?.addEventListener("scroll", handleViewportChange);
+    handleViewportChange();
 
     return () => {
-      window.visualViewport?.removeEventListener("resize", grow);
-      window.visualViewport?.removeEventListener("scroll", grow);
+      window.visualViewport?.removeEventListener("resize", handleViewportChange);
+      window.visualViewport?.removeEventListener("scroll", handleViewportChange);
     };
   }, []);
 
@@ -101,105 +101,101 @@ const ChatBox = () => {
   return (
     <>
       <style>{`
-        /* Sabse pehle browser ki default scrolling maaro */
+        /* Kill browser default push */
         html, body {
           overflow: hidden !important;
-          overscroll-behavior: none;
           position: fixed;
           width: 100%;
           height: 100%;
+          background: #000;
         }
 
-        #chat-viewport-wrapper {
-          position: absolute;
+        #chat-box-wrapper {
+          position: fixed;
           top: 0;
           left: 0;
-          width: 100%;
+          right: 0;
           display: flex;
           flex-direction: column;
           background-color: #050505;
           z-index: 100;
+          overflow: hidden;
         }
 
-        /* Cyber Aura Background */
-        .cyber-aura {
+        .premium-aura {
           position: absolute;
           inset: 0;
           background: 
-            radial-gradient(circle at 10% 20%, ${hexToRGBA(accentColor, 0.08)} 0%, transparent 40%),
-            radial-gradient(circle at 90% 80%, ${hexToRGBA(accentColor, 0.06)} 0%, transparent 40%);
+            radial-gradient(circle at 15% 15%, ${hexToRGBA(accentColor, 0.08)} 0%, transparent 45%),
+            radial-gradient(circle at 85% 85%, ${hexToRGBA(accentColor, 0.05)} 0%, transparent 45%);
           filter: blur(80px);
           z-index: 0;
           pointer-events: none;
         }
 
-        /* Message pop animation */
-        .msg-anim { animation: msgSlide 0.3s ease-out; }
-        @keyframes msgSlide {
-          from { opacity: 0; transform: translateY(10px); }
-          to { opacity: 1; transform: translateY(0); }
+        .msg-bubble { animation: msgFade 0.2s ease-out; }
+        @keyframes msgFade {
+          from { opacity: 0; transform: scale(0.98); }
+          to { opacity: 1; transform: scale(1); }
         }
       `}</style>
 
-      {/* Profile Modal */}
       {isProfileOpen && (
-        <div className="fixed inset-0 z-[1000] flex items-center justify-center">
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center">
           <ProfileModal isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)} user={profileUser} />
         </div>
       )}
 
-      <div id="chat-viewport-wrapper" style={{ fontFamily: config?.font }}>
-        <div className="cyber-aura" />
+      <div id="chat-box-wrapper" style={{ fontFamily: config?.font }}>
+        <div className="premium-aura" />
 
-        {/* --- PREMIUM HEADER --- */}
-        <header className="flex-shrink-0 w-full flex items-center justify-between px-4 py-3 bg-black/70 backdrop-blur-3xl border-b border-white/5 z-20">
-          <div className="flex items-center gap-3 min-w-0">
+        {/* --- HEADER (STICKY TO TOP) --- */}
+        <div className="flex-shrink-0 w-full h-[70px] flex items-center justify-between px-4 bg-black/60 backdrop-blur-3xl border-b border-white/5 z-30">
+          <div className="flex items-center gap-3">
             <button onClick={() => setSelectedChat(null)} className="p-1 md:hidden" style={{ color: accentColor }}>
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="m15 18-6-6 6-6" /></svg>
             </button>
-            <div onClick={openProfile} className="flex items-center cursor-pointer gap-3 min-w-0">
-              <div className="w-10 h-10 rounded-2xl border-2 flex-shrink-0 overflow-hidden" 
-                   style={{ borderColor: hexToRGBA(accentColor, 0.2), backgroundColor: '#0a0a0a' }}>
+            <div onClick={openProfile} className="flex items-center cursor-pointer gap-3">
+              <div className="w-11 h-11 rounded-2xl border-2 overflow-hidden bg-zinc-900" style={{ borderColor: hexToRGBA(accentColor, 0.2) }}>
                 {receiverPic ? <img src={receiverPic} className="w-full h-full object-cover" alt="" /> : <div className="w-full h-full flex items-center justify-center font-black" style={{color: accentColor}}>{receiverName.charAt(0)}</div>}
               </div>
-              <div className="min-w-0">
-                <h2 className="text-[14px] font-black text-white truncate uppercase italic tracking-tight">{receiverName}</h2>
-                <div className="flex items-center gap-1.5">
-                   <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{backgroundColor: accentColor}}></span>
-                   <p className="text-[8px] font-bold opacity-40 uppercase tracking-widest">Active Signal</p>
+              <div className="flex flex-col">
+                <h2 className="text-[15px] font-black text-white uppercase italic leading-none">{receiverName}</h2>
+                <div className="flex items-center gap-1.5 mt-1">
+                   <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{backgroundColor: accentColor}}></div>
+                   <p className="text-[8px] font-bold opacity-40 uppercase tracking-widest">Connected</p>
                 </div>
               </div>
             </div>
           </div>
           
-          <div className="relative">
-            <button onClick={() => setShowMenu(!showMenu)} className="p-2 text-zinc-600">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5">
-                <circle cx="12" cy="12" r="1" /><circle cx="12" cy="5" r="1" /><circle cx="12" cy="19" r="1" />
-              </svg>
-            </button>
-            {showMenu && (
-              <div className="absolute right-0 mt-2 w-48 bg-[#0a0a0a] border border-white/10 rounded-2xl shadow-2xl z-[110] overflow-hidden">
-                <button onClick={openProfile} className="w-full px-4 py-4 text-left text-[10px] font-black text-white uppercase hover:bg-white/5 border-b border-white/5">View Identity</button>
-                <button className="w-full px-4 py-4 text-left text-[10px] font-black text-red-500 uppercase hover:bg-red-500/5">Block Contact</button>
-              </div>
-            )}
-          </div>
-        </header>
+          <button onClick={() => setShowMenu(!showMenu)} className="p-2 text-zinc-600">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4">
+              <circle cx="12" cy="12" r="1" /><circle cx="12" cy="5" r="1" /><circle cx="12" cy="19" r="1" />
+            </svg>
+          </button>
+          
+          {showMenu && (
+            <div className="absolute right-4 top-16 w-48 bg-[#0a0a0a] border border-white/10 rounded-2xl shadow-2xl z-[150] overflow-hidden">
+              <button onClick={openProfile} className="w-full px-4 py-4 text-left text-[10px] font-black text-white uppercase border-b border-white/5 hover:bg-white/5">View Identity</button>
+              <button className="w-full px-4 py-4 text-left text-[10px] font-black text-red-500 uppercase hover:bg-red-500/5">Block User</button>
+            </div>
+          )}
+        </div>
 
         {/* --- CHAT AREA --- */}
-        <main className="flex-1 overflow-y-auto px-4 py-6 space-y-6 relative z-10 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto px-4 py-6 space-y-6 relative z-10 custom-scrollbar">
           {messages.map((m) => {
             const isMine = (m.sender?._id || m.sender) === (user?.user?._id || user?._id);
             return (
-              <div key={m._id} className={`flex ${isMine ? 'justify-end' : 'justify-start'} msg-anim`}>
-                <div className="max-w-[85%] px-4 py-3 text-[14px] shadow-xl"
+              <div key={m._id} className={`flex ${isMine ? 'justify-end' : 'justify-start'} msg-bubble`}>
+                <div className="max-w-[82%] px-4 py-3 text-[14px] leading-relaxed shadow-xl"
                   style={{
-                    borderRadius: isMine ? '22px 22px 4px 22px' : '22px 22px 22px 4px',
+                    borderRadius: isMine ? '24px 24px 4px 24px' : '24px 24px 24px 4px',
                     backgroundColor: isMine ? hexToRGBA(accentColor, 0.15) : 'rgba(255,255,255,0.04)',
                     color: '#fff',
-                    border: `1px solid ${isMine ? hexToRGBA(accentColor, 0.25) : 'rgba(255,255,255,0.06)'}`,
-                    backdropFilter: 'blur(10px)',
+                    border: `1px solid ${isMine ? hexToRGBA(accentColor, 0.2) : 'rgba(255,255,255,0.06)'}`,
+                    backdropFilter: 'blur(15px)',
                   }}>
                   {m.content}
                 </div>
@@ -207,25 +203,25 @@ const ChatBox = () => {
             );
           })}
           <div ref={messagesEndRef} />
-        </main>
+        </div>
 
         {/* --- INPUT BAR --- */}
-        <footer className="flex-shrink-0 p-4 bg-black/40 backdrop-blur-2xl border-t border-white/5 z-20">
-          <div className="flex items-center gap-2 bg-white/[0.03] border border-white/10 pl-4 pr-1.5 py-1.5 rounded-[24px]">
+        <div className="flex-shrink-0 p-4 bg-black/40 backdrop-blur-3xl border-t border-white/5 z-20">
+          <div className="flex items-center gap-2 bg-white/[0.03] border border-white/10 pl-5 pr-1.5 py-1.5 rounded-[26px]">
             <input
               ref={inputRef}
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && sendMessage()}
-              placeholder="Send signal..."
-              className="flex-1 bg-transparent outline-none text-[13px] text-white py-2"
+              placeholder="Start typing..."
+              className="flex-1 bg-transparent outline-none text-[14px] text-white py-2"
             />
-            <button onClick={sendMessage} className="w-10 h-10 flex items-center justify-center rounded-full active:scale-90 transition-transform"
-                    style={{ backgroundColor: accentColor, color: '#000', boxShadow: `0 0 15px ${hexToRGBA(accentColor, 0.3)}` }}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4"><path d="m22 2-7 20-4-9-9-4Z" /><path d="M22 2 11 13" /></svg>
+            <button onClick={sendMessage} className="w-11 h-11 flex items-center justify-center rounded-full active:scale-90 transition-all"
+                    style={{ backgroundColor: accentColor, color: '#000', boxShadow: `0 0 20px ${hexToRGBA(accentColor, 0.4)}` }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5"><path d="m22 2-7 20-4-9-9-4Z" /><path d="M22 2 11 13" /></svg>
             </button>
           </div>
-        </footer>
+        </div>
       </div>
     </>
   );
