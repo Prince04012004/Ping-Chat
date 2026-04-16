@@ -16,6 +16,21 @@ const ChatBox = () => {
   const menuRef = useRef(null);
   const inputRef = useRef(null);
 
+  // ✅ VIEWPORT HEIGHT FIX (prevents upward jump)
+  useEffect(() => {
+    const setAppHeight = () => {
+      document.documentElement.style.setProperty(
+        "--app-height",
+        `${window.innerHeight}px`
+      );
+    };
+
+    setAppHeight();
+    window.addEventListener("resize", setAppHeight);
+
+    return () => window.removeEventListener("resize", setAppHeight);
+  }, []);
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
@@ -27,7 +42,6 @@ const ChatBox = () => {
 
   const getReceiverData = () => {
     if (!selectedChat?.users || !user) return null;
-
     const userData = user?.user || user;
     const myId = (userData?._id || userData?.id)?.toString();
 
@@ -43,13 +57,18 @@ const ChatBox = () => {
   const receiverPic = receiver?.profilepic || receiver?.pic || "";
 
   const openProfile = async () => {
-    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+    if (document.activeElement instanceof HTMLElement)
+      document.activeElement.blur();
 
     const targetId = receiver?._id || receiver?.id;
     if (!targetId) return;
 
     try {
-      const { data } = await API.get(`/api/getprofile/${targetId}`, getAuthHeader());
+      const { data } = await API.get(
+        `/api/getprofile/${targetId}`,
+        getAuthHeader()
+      );
+
       setProfileUser(data);
       setShowMenu(false);
       setIsProfileOpen(true);
@@ -109,7 +128,7 @@ const ChatBox = () => {
         #chat-master-container {
           position: fixed;
           inset: 0;
-          height: 100dvh;
+          height: var(--app-height);
           width: 100%;
           display: flex;
           flex-direction: column;
@@ -120,8 +139,15 @@ const ChatBox = () => {
         .cyber-grid {
           position: absolute;
           inset: 0;
-          background-image: linear-gradient(${hexToRGBA(accentColor, 0.05)} 1px, transparent 1px), 
-                            linear-gradient(90deg, ${hexToRGBA(accentColor, 0.05)} 1px, transparent 1px);
+          background-image: linear-gradient(${hexToRGBA(
+            accentColor,
+            0.05
+          )} 1px, transparent 1px),
+            linear-gradient(
+              90deg,
+              ${hexToRGBA(accentColor, 0.05)} 1px,
+              transparent 1px
+            );
           background-size: 45px 45px;
           opacity: 0.4;
           z-index: 0;
@@ -140,8 +166,14 @@ const ChatBox = () => {
         }
 
         @keyframes float {
-          from { top: 0%; left: 0%; }
-          to { top: 50%; left: 60%; }
+          from {
+            top: 0%;
+            left: 0%;
+          }
+          to {
+            top: 50%;
+            left: 60%;
+          }
         }
 
         .custom-scrollbar::-webkit-scrollbar {
@@ -204,13 +236,6 @@ const ChatBox = () => {
                     </div>
                   )}
                 </div>
-
-                <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-black flex items-center justify-center">
-                  <div
-                    className="w-2 h-2 rounded-full animate-pulse"
-                    style={{ backgroundColor: accentColor }}
-                  ></div>
-                </div>
               </div>
 
               <div className="min-w-0">
@@ -224,7 +249,6 @@ const ChatBox = () => {
             </div>
           </div>
 
-          {/* 3 DOT MENU */}
           <button
             onClick={() => setShowMenu(!showMenu)}
             className="p-2 text-zinc-600 hover:text-white transition-colors"
@@ -240,7 +264,6 @@ const ChatBox = () => {
               >
                 Identity
               </button>
-
               <button className="w-full px-5 py-4 text-left text-[10px] font-black text-red-500 uppercase hover:bg-red-500/5">
                 Terminate
               </button>
@@ -249,7 +272,10 @@ const ChatBox = () => {
         </div>
 
         {/* CHAT AREA */}
-        <div className="flex-1 overflow-y-auto px-5 py-6 space-y-7 relative z-10 custom-scrollbar">
+        <div
+          className="flex-1 overflow-y-auto px-5 py-6 space-y-7 relative z-10 custom-scrollbar"
+          style={{ WebkitOverflowScrolling: "touch" }}
+        >
           {messages.map((m) => {
             const isMine =
               (m.sender?._id || m.sender) ===
@@ -270,6 +296,12 @@ const ChatBox = () => {
                       ? hexToRGBA(accentColor, 0.18)
                       : "rgba(255,255,255,0.04)",
                     color: "#fff",
+                    border: `1px solid ${
+                      isMine
+                        ? hexToRGBA(accentColor, 0.3)
+                        : "rgba(255,255,255,0.08)"
+                    }`,
+                    backdropFilter: "blur(15px)",
                   }}
                 >
                   {m.content}
@@ -295,10 +327,11 @@ const ChatBox = () => {
 
             <button
               onClick={sendMessage}
-              className="w-11 h-11 flex items-center justify-center rounded-full"
+              className="w-11 h-11 flex items-center justify-center rounded-full active:scale-90 transition-all shadow-lg"
               style={{
                 backgroundColor: accentColor,
                 color: "#000",
+                boxShadow: `0 0 20px ${hexToRGBA(accentColor, 0.4)}`,
               }}
             >
               ➤
