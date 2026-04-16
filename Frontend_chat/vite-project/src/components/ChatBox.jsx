@@ -10,10 +10,10 @@ const ChatBox = () => {
   const [showMenu, setShowMenu] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [profileUser, setProfileUser] = useState(null);
-
   const accentColor = config?.accent || "#10b981";
 
   const messagesEndRef = useRef(null);
+  const menuRef = useRef(null);
   const inputRef = useRef(null);
 
   useEffect(() => {
@@ -50,7 +50,6 @@ const ChatBox = () => {
 
     try {
       const { data } = await API.get(`/api/getprofile/${targetId}`, getAuthHeader());
-
       setProfileUser(data);
       setShowMenu(false);
       setIsProfileOpen(true);
@@ -67,10 +66,7 @@ const ChatBox = () => {
 
       const { data } = await API.post(
         "/api/sendmessage",
-        {
-          content: newMessage,
-          chatid: selectedChat._id,
-        },
+        { content: newMessage, chatid: selectedChat._id },
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -95,7 +91,6 @@ const ChatBox = () => {
           `/api/allmessages/${selectedChat._id}`,
           getAuthHeader()
         );
-
         setMessages(data);
       } catch (err) {
         console.error(err);
@@ -111,63 +106,57 @@ const ChatBox = () => {
     <>
       <style>{`
 
-      #chat-master-container {
-        position: fixed;
-        inset: 0;
-        height: 100dvh;
-        width: 100%;
-        display: flex;
-        flex-direction: column;
-        background: #050505;
-        z-index: 100;
-      }
-
-      .cyber-grid {
-        position: absolute;
-        inset: 0;
-        background-image: linear-gradient(${hexToRGBA(accentColor, 0.05)} 1px, transparent 1px), 
-                          linear-gradient(90deg, ${hexToRGBA(accentColor, 0.05)} 1px, transparent 1px);
-        background-size: 45px 45px;
-        opacity: 0.4;
-        z-index: 0;
-        pointer-events: none;
-      }
-
-      .aura-sphere {
-        position: absolute;
-        width: 350px;
-        height: 350px;
-        background: ${hexToRGBA(accentColor, 0.1)};
-        filter: blur(100px);
-        border-radius: 50%;
-        z-index: 0;
-        animation: float 8s infinite alternate;
-      }
-
-      @keyframes float {
-        from {
-          top: 0%;
-          left: 0%;
+        #chat-master-container {
+          position: fixed;
+          inset: 0;
+          height: 100dvh;
+          width: 100%;
+          display: flex;
+          flex-direction: column;
+          background: #050505;
+          z-index: 100;
         }
-        to {
-          top: 50%;
-          left: 60%;
+
+        .cyber-grid {
+          position: absolute;
+          inset: 0;
+          background-image: linear-gradient(${hexToRGBA(accentColor, 0.05)} 1px, transparent 1px), 
+                            linear-gradient(90deg, ${hexToRGBA(accentColor, 0.05)} 1px, transparent 1px);
+          background-size: 45px 45px;
+          opacity: 0.4;
+          z-index: 0;
+          pointer-events: none;
         }
-      }
 
-      .custom-scrollbar::-webkit-scrollbar {
-        width: 3px;
-      }
+        .aura-sphere {
+          position: absolute;
+          width: 350px;
+          height: 350px;
+          background: ${hexToRGBA(accentColor, 0.1)};
+          filter: blur(100px);
+          border-radius: 50%;
+          z-index: 0;
+          animation: float 8s infinite alternate;
+        }
 
-      .custom-scrollbar::-webkit-scrollbar-thumb {
-        background: ${hexToRGBA(accentColor, 0.3)};
-        border-radius: 10px;
-      }
+        @keyframes float {
+          from { top: 0%; left: 0%; }
+          to { top: 50%; left: 60%; }
+        }
+
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 3px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: ${hexToRGBA(accentColor, 0.3)};
+          border-radius: 10px;
+        }
 
       `}</style>
 
       {isProfileOpen && (
-        <div className="fixed inset-0 z-[2000] flex items-center justify-center">
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center pointer-events-auto">
           <ProfileModal
             isOpen={isProfileOpen}
             onClose={() => setIsProfileOpen(false)}
@@ -177,15 +166,12 @@ const ChatBox = () => {
       )}
 
       <div id="chat-master-container" style={{ fontFamily: config?.font }}>
-        
         <div className="cyber-grid" />
         <div className="aura-sphere" />
 
         {/* HEADER */}
         <div className="sticky top-0 flex-shrink-0 w-full h-[70px] flex items-center justify-between px-5 bg-black/80 backdrop-blur-3xl border-b border-white/5 z-50">
-          
           <div className="flex items-center gap-4 min-w-0">
-            
             <button
               onClick={() => setSelectedChat(null)}
               className="p-1 md:hidden"
@@ -198,7 +184,6 @@ const ChatBox = () => {
               onClick={openProfile}
               className="flex items-center cursor-pointer gap-3 min-w-0"
             >
-              
               <div className="relative">
                 <div
                   className="w-11 h-11 rounded-2xl border-2 overflow-hidden bg-black"
@@ -219,24 +204,52 @@ const ChatBox = () => {
                     </div>
                   )}
                 </div>
+
+                <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-black flex items-center justify-center">
+                  <div
+                    className="w-2 h-2 rounded-full animate-pulse"
+                    style={{ backgroundColor: accentColor }}
+                  ></div>
+                </div>
               </div>
 
               <div className="min-w-0">
                 <h2 className="text-[15px] font-black text-white truncate uppercase italic leading-none">
                   {receiverName}
                 </h2>
+                <p className="text-[8px] font-bold opacity-30 uppercase tracking-[2px] mt-1">
+                  Live Connection
+                </p>
               </div>
-
             </div>
           </div>
+
+          {/* 3 DOT MENU */}
+          <button
+            onClick={() => setShowMenu(!showMenu)}
+            className="p-2 text-zinc-600 hover:text-white transition-colors"
+          >
+            ⋮
+          </button>
+
+          {showMenu && (
+            <div className="absolute right-5 top-16 w-48 bg-[#0a0a0a]/95 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl z-[150] overflow-hidden">
+              <button
+                onClick={openProfile}
+                className="w-full px-5 py-4 text-left text-[10px] font-black text-white uppercase border-b border-white/5 hover:bg-white/5"
+              >
+                Identity
+              </button>
+
+              <button className="w-full px-5 py-4 text-left text-[10px] font-black text-red-500 uppercase hover:bg-red-500/5">
+                Terminate
+              </button>
+            </div>
+          )}
         </div>
 
         {/* CHAT AREA */}
-        <div
-          className="flex-1 overflow-y-auto px-5 py-6 space-y-7 relative z-10 custom-scrollbar"
-          style={{ WebkitOverflowScrolling: "touch" }}
-        >
-          
+        <div className="flex-1 overflow-y-auto px-5 py-6 space-y-7 relative z-10 custom-scrollbar">
           {messages.map((m) => {
             const isMine =
               (m.sender?._id || m.sender) ===
@@ -245,9 +258,7 @@ const ChatBox = () => {
             return (
               <div
                 key={m._id}
-                className={`flex ${
-                  isMine ? "justify-end" : "justify-start"
-                }`}
+                className={`flex ${isMine ? "justify-end" : "justify-start"}`}
               >
                 <div
                   className="max-w-[82%] px-5 py-3.5 text-[14.5px] leading-relaxed shadow-xl"
@@ -255,11 +266,9 @@ const ChatBox = () => {
                     borderRadius: isMine
                       ? "24px 24px 4px 24px"
                       : "24px 24px 24px 4px",
-
                     backgroundColor: isMine
                       ? hexToRGBA(accentColor, 0.18)
                       : "rgba(255,255,255,0.04)",
-
                     color: "#fff",
                   }}
                 >
@@ -274,9 +283,7 @@ const ChatBox = () => {
 
         {/* INPUT BAR */}
         <div className="sticky bottom-0 flex-shrink-0 p-5 bg-black/40 backdrop-blur-3xl border-t border-white/5 z-20">
-          
           <div className="flex items-center gap-3 bg-white/[0.04] border border-white/10 pl-6 pr-2 py-2 rounded-[28px] shadow-inner">
-            
             <input
               ref={inputRef}
               value={newMessage}
@@ -296,11 +303,8 @@ const ChatBox = () => {
             >
               ➤
             </button>
-
           </div>
-
         </div>
-
       </div>
     </>
   );
