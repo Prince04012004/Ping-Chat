@@ -7,37 +7,46 @@ const ChatBox = () => {
   const { selectedChat, setSelectedChat, user, config, hexToRGBA } = ChatState();
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
+  const [loading, setLoading] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [profileUser, setProfileUser] = useState(null);
   const accentColor = config?.accent || "#10b981";
 
+  const chatAreaRef = useRef(null);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
 
-  // ✅ ULTRA-SMOOTH VIEWPORT LOGIC
+  // ✅ ULTRA-SMOOTH VIEWPORT & HEIGHT LOCK
   useEffect(() => {
     const updateHeight = () => {
       if (window.visualViewport) {
-        // Sirf ek CSS variable set karo, poore DOM ko touch mat karo
         document.documentElement.style.setProperty('--vh', `${window.visualViewport.height}px`);
         window.scrollTo(0, 0);
       }
     };
-
-    // passive: true se scrolling aur resize smooth ho jata hai
     window.visualViewport?.addEventListener('resize', updateHeight, { passive: true });
     window.visualViewport?.addEventListener('scroll', updateHeight, { passive: true });
     updateHeight();
-
     return () => {
       window.visualViewport?.removeEventListener('resize', updateHeight);
       window.visualViewport?.removeEventListener('scroll', updateHeight);
     };
   }, []);
 
+  // ✅ SMART SCROLL LOGIC
+  const scrollToBottom = (force = false) => {
+    if (!chatAreaRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = chatAreaRef.current;
+    const isAtBottom = scrollHeight - scrollTop - clientHeight < 150;
+
+    if (force || isAtBottom) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  };
+
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    scrollToBottom();
   }, [messages]);
 
   const getAuthHeader = () => {
@@ -78,67 +87,50 @@ const ChatBox = () => {
       );
       setNewMessage("");
       setMessages((prev) => [...prev, data]);
+      scrollToBottom(true); // Naya message bhejne par force scroll
     } catch (err) { console.error(err); }
   };
 
   useEffect(() => {
     const fetchMessages = async () => {
       if (!selectedChat?._id) return;
+      setLoading(true);
       try {
         const { data } = await API.get(`/api/allmessages/${selectedChat._id}`, getAuthHeader());
         setMessages(data);
-      } catch (err) { console.error(err); }
+        setLoading(false);
+      } catch (err) { 
+        console.error(err);
+        setLoading(false);
+      }
     };
     fetchMessages();
   }, [selectedChat?._id]);
+
+  // SKELETON COMPONENT
+  const MessageSkeleton = () => (
+    <div className="space-y-6 animate-pulse">
+      {[1, 2, 3, 4].map((i) => (
+        <div key={i} className={`flex ${i % 2 === 0 ? 'justify-end' : 'justify-start'}`}>
+          <div className="w-[60%] h-12 rounded-2xl bg-white/5 border border-white/5" />
+        </div>
+      ))}
+    </div>
+  );
 
   if (!selectedChat) return null;
 
   return (
     <>
       <style>{`
-        :root {
-          --vh: 100vh; /* Default value */
-        }
-
-        html, body {
-          overflow: hidden;
-          position: fixed;
-          width: 100%;
-          height: 100%;
-          background: #000;
-        }
-
+        :root { --vh: 100vh; }
+        html, body { overflow: hidden; position: fixed; width: 100%; height: 100%; background: #000; }
         #chat-master-container {
-          position: fixed;
-          top: 0; left: 0; width: 100%;
-          /* YAHAN MAGIC HAI: CSS Variable use ho raha hai */
-          height: var(--vh);
-          display: flex;
-          flex-direction: column;
-          background: #050505;
-          z-index: 100;
-          overflow: hidden;
-          /* GPU Acceleration */
-          will-change: height;
-          transition: height 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+          position: fixed; top: 0; left: 0; width: 100%; height: var(--vh);
+          display: flex; flex-direction: column; background: #050505; z-index: 100; overflow: hidden;
+          will-change: height; transition: height 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
         }
-
-        .cyber-grid {
-          position: absolute; inset: 0;
-          background-image: linear-gradient(${hexToRGBA(accentColor, 0.05)} 1px, transparent 1px),
-                            linear-gradient(90deg, ${hexToRGBA(accentColor, 0.05)} 1px, transparent 1px);
-          background-size: 45px 45px; opacity: .4; z-index: 0; pointer-events: none;
-        }
-
-        .aura-sphere {
-          position: absolute; width: 350px; height: 350px;
-          background: ${hexToRGBA(accentColor, 0.1)};
-          filter: blur(100px); border-radius: 50%;
-          z-index: 0; animation: float 8s infinite alternate;
-        }
-
-        @keyframes float { from { top: 0%; left: 0%; } to { top: 50%; left: 60%; } }
+        .cyber-grid { position: absolute; inset: 0; background-image: linear-gradient(${hexToRGBA(accentColor, 0.05)} 1px, transparent 1px), linear-gradient(90deg, ${hexToRGBA(accentColor, 0.05)} 1px, transparent 1px); background-size: 45px 45px; opacity: .4; z-index: 0; pointer-events: none; }
         .custom-scrollbar::-webkit-scrollbar { width: 3px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: ${hexToRGBA(accentColor, 0.3)}; border-radius: 10px; }
       `}</style>
@@ -151,49 +143,52 @@ const ChatBox = () => {
 
       <div id="chat-master-container" style={{ fontFamily: config?.font }}>
         <div className="cyber-grid" />
-        <div className="aura-sphere" />
 
         {/* HEADER */}
-        <div className="flex-shrink-0 w-full h-[70px] flex items-center justify-between px-5 bg-black/80 backdrop-blur-3xl border-b border-white/5 z-[150]">
+        <header className="flex-shrink-0 w-full h-[70px] flex items-center justify-between px-5 bg-black/80 backdrop-blur-3xl border-b border-white/5 z-[150]">
           <div className="flex items-center gap-4">
             <button onClick={() => setSelectedChat(null)} className="p-1 md:hidden" style={{ color: accentColor }}> ← </button>
             <div onClick={openProfile} className="flex items-center gap-3 cursor-pointer">
               <div className="w-11 h-11 rounded-2xl border-2 overflow-hidden bg-black" style={{ borderColor: hexToRGBA(accentColor, 0.2) }}>
                 {receiverPic ? <img src={receiverPic} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center font-black" style={{ color: accentColor }}>{receiverName.charAt(0)}</div>}
               </div>
-              <div>
-                <h2 className="text-[15px] font-black text-white uppercase italic leading-none">{receiverName}</h2>
-                <p className="text-[8px] font-bold opacity-30 uppercase tracking-[2px] mt-1">Live Connection</p>
-              </div>
+              <h2 className="text-[15px] font-black text-white uppercase italic leading-none">{receiverName}</h2>
             </div>
           </div>
           <button onClick={() => setShowMenu(!showMenu)} className="p-2 text-zinc-600 hover:text-white"> ⋮ </button>
-        </div>
+        </header>
 
         {/* CHAT AREA */}
-        <div className="flex-1 overflow-y-auto px-5 py-6 space-y-7 relative z-10 custom-scrollbar">
-          {messages.map((m) => {
-            const isMine = (m.sender?._id || m.sender) === (user?.user?._id || user?._id);
-            return (
-              <div key={m._id} className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
-                <div className="max-w-[82%] px-5 py-3.5 text-[14.5px] leading-relaxed shadow-xl"
-                  style={{
-                    borderRadius: isMine ? "24px 24px 4px 24px" : "24px 24px 24px 4px",
-                    backgroundColor: isMine ? hexToRGBA(accentColor, 0.18) : "rgba(255,255,255,0.04)",
-                    color: "#fff",
-                    border: `1px solid ${isMine ? hexToRGBA(accentColor, 0.3) : "rgba(255,255,255,0.08)"}`,
-                    backdropFilter: "blur(15px)"
-                  }}>
-                  {m.content}
+        <main 
+          ref={chatAreaRef}
+          className="flex-1 overflow-y-auto px-5 py-6 space-y-7 relative z-10 custom-scrollbar"
+        >
+          {loading ? (
+            <MessageSkeleton />
+          ) : (
+            messages.map((m) => {
+              const isMine = (m.sender?._id || m.sender) === (user?.user?._id || user?._id);
+              return (
+                <div key={m._id} className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
+                  <div className="max-w-[82%] px-5 py-3.5 text-[14.5px] leading-relaxed shadow-xl"
+                    style={{
+                      borderRadius: isMine ? "24px 24px 4px 24px" : "24px 24px 24px 4px",
+                      backgroundColor: isMine ? hexToRGBA(accentColor, 0.18) : "rgba(255,255,255,0.04)",
+                      color: "#fff",
+                      border: `1px solid ${isMine ? hexToRGBA(accentColor, 0.3) : "rgba(255,255,255,0.08)"}`,
+                      backdropFilter: "blur(15px)"
+                    }}>
+                    {m.content}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })
+          )}
           <div ref={messagesEndRef} />
-        </div>
+        </main>
 
         {/* INPUT */}
-        <div className="flex-shrink-0 p-5 bg-black/40 backdrop-blur-3xl border-t border-white/5 z-20">
+        <footer className="flex-shrink-0 p-5 bg-black/40 backdrop-blur-3xl border-t border-white/5 z-20">
           <div className="flex items-center gap-3 bg-white/[0.04] border border-white/10 pl-6 pr-2 py-2 rounded-[28px]">
             <input
               ref={inputRef}
@@ -208,7 +203,7 @@ const ChatBox = () => {
               ➤
             </button>
           </div>
-        </div>
+        </footer>
       </div>
     </>
   );
