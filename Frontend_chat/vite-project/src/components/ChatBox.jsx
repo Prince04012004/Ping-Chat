@@ -14,22 +14,27 @@ const ChatBox = () => {
 
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
+  const containerRef = useRef(null);
 
-  // ✅ MOBILE VIEWPORT HEIGHT LOCK
+  // ✅ DYNAMIC VIEWPORT LOCK (Anti-Keyboard Jump Logic)
   useEffect(() => {
-    const setHeight = () => {
-      const height = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-      const container = document.getElementById("chat-master-container");
-      if (container) {
-        container.style.height = height + "px";
+    const handleViewportChange = () => {
+      if (window.visualViewport && containerRef.current) {
+        const vv = window.visualViewport;
+        // Height ko actual visible area ke barabar lock kar do
+        containerRef.current.style.height = `${vv.height}px`;
+        // Browser ko force karo ki wo page ko scroll na kare (Keyboard jump fix)
+        window.scrollTo(0, 0);
       }
     };
-    setHeight();
-    window.addEventListener("resize", setHeight);
-    window.visualViewport?.addEventListener("resize", setHeight);
+
+    window.visualViewport?.addEventListener("resize", handleViewportChange);
+    window.visualViewport?.addEventListener("scroll", handleViewportChange);
+    handleViewportChange(); // Initial set
+
     return () => {
-      window.removeEventListener("resize", setHeight);
-      window.visualViewport?.removeEventListener("resize", setHeight);
+      window.visualViewport?.removeEventListener("resize", handleViewportChange);
+      window.visualViewport?.removeEventListener("scroll", handleViewportChange);
     };
   }, []);
 
@@ -94,6 +99,15 @@ const ChatBox = () => {
   return (
     <>
       <style>{`
+        /* Sabse important: Body ko freeze kar do */
+        html, body {
+          overflow: hidden !important;
+          position: fixed;
+          width: 100%;
+          height: 100%;
+          overscroll-behavior: none;
+        }
+
         #chat-master-container {
           position: fixed;
           top: 0; left: 0; width: 100%;
@@ -102,27 +116,25 @@ const ChatBox = () => {
           background: #050505;
           z-index: 100;
           overflow: hidden;
+          /* Layout Shift ko smooth banane ke liye */
+          transition: height 0.1s ease-out;
         }
 
         .cyber-grid {
-          position: absolute;
-          inset: 0;
+          position: absolute; inset: 0;
           background-image: linear-gradient(${hexToRGBA(accentColor, 0.05)} 1px, transparent 1px),
                             linear-gradient(90deg, ${hexToRGBA(accentColor, 0.05)} 1px, transparent 1px);
-          background-size: 45px 45px;
-          opacity: .4; z-index: 0; pointer-events: none;
+          background-size: 45px 45px; opacity: .4; z-index: 0; pointer-events: none;
         }
 
         .aura-sphere {
-          position: absolute;
-          width: 350px; height: 350px;
+          position: absolute; width: 350px; height: 350px;
           background: ${hexToRGBA(accentColor, 0.1)};
           filter: blur(100px); border-radius: 50%;
           z-index: 0; animation: float 8s infinite alternate;
         }
 
         @keyframes float { from { top: 0%; left: 0%; } to { top: 50%; left: 60%; } }
-
         .custom-scrollbar::-webkit-scrollbar { width: 3px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: ${hexToRGBA(accentColor, 0.3)}; border-radius: 10px; }
       `}</style>
@@ -133,35 +145,36 @@ const ChatBox = () => {
         </div>
       )}
 
-      {/* --- STEP 1: FIXED HEADER (Isse container se bahar rakha hai) --- */}
-      <div className="fixed top-0 left-0 w-full h-[70px] flex items-center justify-between px-5 bg-black/80 backdrop-blur-3xl border-b border-white/5 z-[150]">
-        <div className="flex items-center gap-4">
-          <button onClick={() => setSelectedChat(null)} className="p-1 md:hidden" style={{ color: accentColor }}> ← </button>
-          <div onClick={openProfile} className="flex items-center gap-3 cursor-pointer">
-            <div className="w-11 h-11 rounded-2xl border-2 overflow-hidden bg-black" style={{ borderColor: hexToRGBA(accentColor, 0.2) }}>
-              {receiverPic ? <img src={receiverPic} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center font-black" style={{ color: accentColor }}>{receiverName.charAt(0)}</div>}
-            </div>
-            <div>
-              <h2 className="text-[15px] font-black text-white uppercase italic leading-none">{receiverName}</h2>
-              <p className="text-[8px] font-bold opacity-30 uppercase tracking-[2px] mt-1">Live Connection</p>
-            </div>
-          </div>
-        </div>
-        <button onClick={() => setShowMenu(!showMenu)} className="p-2 text-zinc-600 hover:text-white transition-colors"> ⋮ </button>
-        {showMenu && (
-          <div className="absolute right-5 top-16 w-48 bg-[#0a0a0a]/95 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl z-[160] overflow-hidden">
-            <button onClick={openProfile} className="w-full px-5 py-4 text-left text-[10px] font-black text-white uppercase border-b border-white/5 hover:bg-white/5">Identity</button>
-            <button className="w-full px-5 py-4 text-left text-[10px] font-black text-red-500 uppercase hover:bg-red-500/5">Terminate</button>
-          </div>
-        )}
-      </div>
-
-      <div id="chat-master-container" style={{ fontFamily: config?.font }}>
+      <div id="chat-master-container" ref={containerRef} style={{ fontFamily: config?.font }}>
         <div className="cyber-grid" />
         <div className="aura-sphere" />
 
-        {/* --- STEP 2: CHAT AREA (Padding Top add kiya hai 70px header ke liye) --- */}
-        <div className="flex-1 overflow-y-auto px-5 pt-[80px] pb-6 space-y-7 relative z-10 custom-scrollbar">
+        {/* --- FIXED HEADER (Top Par Chipka Hua) --- */}
+        <div className="flex-shrink-0 w-full h-[70px] flex items-center justify-between px-5 bg-black/80 backdrop-blur-3xl border-b border-white/5 z-[150]">
+          <div className="flex items-center gap-4">
+            <button onClick={() => setSelectedChat(null)} className="p-1 md:hidden" style={{ color: accentColor }}> ← </button>
+            <div onClick={openProfile} className="flex items-center gap-3 cursor-pointer">
+              <div className="w-11 h-11 rounded-2xl border-2 overflow-hidden bg-black" style={{ borderColor: hexToRGBA(accentColor, 0.2) }}>
+                {receiverPic ? <img src={receiverPic} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center font-black" style={{ color: accentColor }}>{receiverName.charAt(0)}</div>}
+              </div>
+              <div>
+                <h2 className="text-[15px] font-black text-white uppercase italic leading-none">{receiverName}</h2>
+                <p className="text-[8px] font-bold opacity-30 uppercase tracking-[2px] mt-1">Live Connection</p>
+              </div>
+            </div>
+          </div>
+          <button onClick={() => setShowMenu(!showMenu)} className="p-2 text-zinc-600 hover:text-white"> ⋮ </button>
+          
+          {showMenu && (
+            <div className="absolute right-5 top-16 w-48 bg-[#0a0a0a]/95 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl z-[160] overflow-hidden">
+              <button onClick={openProfile} className="w-full px-5 py-4 text-left text-[10px] font-black text-white uppercase border-b border-white/5 hover:bg-white/5">Identity</button>
+              <button className="w-full px-5 py-4 text-left text-[10px] font-black text-red-500 uppercase hover:bg-red-500/5">Terminate</button>
+            </div>
+          )}
+        </div>
+
+        {/* --- CHAT AREA --- */}
+        <div className="flex-1 overflow-y-auto px-5 py-6 space-y-7 relative z-10 custom-scrollbar">
           {messages.map((m) => {
             const isMine = (m.sender?._id || m.sender) === (user?.user?._id || user?._id);
             return (
@@ -182,8 +195,8 @@ const ChatBox = () => {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* --- STEP 3: INPUT (Sticky bottom) --- */}
-        <div className="sticky bottom-0 p-5 bg-black/40 backdrop-blur-3xl border-t border-white/5 z-20">
+        {/* --- INPUT AREA (Ye keyboard ke upar automatic stick hoga) --- */}
+        <div className="flex-shrink-0 p-5 bg-black/40 backdrop-blur-3xl border-t border-white/5 z-20">
           <div className="flex items-center gap-3 bg-white/[0.04] border border-white/10 pl-6 pr-2 py-2 rounded-[28px]">
             <input
               ref={inputRef}
