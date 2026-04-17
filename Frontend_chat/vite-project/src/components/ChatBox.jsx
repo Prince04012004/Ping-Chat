@@ -14,27 +14,25 @@ const ChatBox = () => {
 
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
-  const containerRef = useRef(null);
 
-  // ✅ DYNAMIC VIEWPORT LOCK (Anti-Keyboard Jump Logic)
+  // ✅ ULTRA-SMOOTH VIEWPORT LOGIC
   useEffect(() => {
-    const handleViewportChange = () => {
-      if (window.visualViewport && containerRef.current) {
-        const vv = window.visualViewport;
-        // Height ko actual visible area ke barabar lock kar do
-        containerRef.current.style.height = `${vv.height}px`;
-        // Browser ko force karo ki wo page ko scroll na kare (Keyboard jump fix)
+    const updateHeight = () => {
+      if (window.visualViewport) {
+        // Sirf ek CSS variable set karo, poore DOM ko touch mat karo
+        document.documentElement.style.setProperty('--vh', `${window.visualViewport.height}px`);
         window.scrollTo(0, 0);
       }
     };
 
-    window.visualViewport?.addEventListener("resize", handleViewportChange);
-    window.visualViewport?.addEventListener("scroll", handleViewportChange);
-    handleViewportChange(); // Initial set
+    // passive: true se scrolling aur resize smooth ho jata hai
+    window.visualViewport?.addEventListener('resize', updateHeight, { passive: true });
+    window.visualViewport?.addEventListener('scroll', updateHeight, { passive: true });
+    updateHeight();
 
     return () => {
-      window.visualViewport?.removeEventListener("resize", handleViewportChange);
-      window.visualViewport?.removeEventListener("scroll", handleViewportChange);
+      window.visualViewport?.removeEventListener('resize', updateHeight);
+      window.visualViewport?.removeEventListener('scroll', updateHeight);
     };
   }, []);
 
@@ -99,25 +97,31 @@ const ChatBox = () => {
   return (
     <>
       <style>{`
-        /* Sabse important: Body ko freeze kar do */
+        :root {
+          --vh: 100vh; /* Default value */
+        }
+
         html, body {
-          overflow: hidden !important;
+          overflow: hidden;
           position: fixed;
           width: 100%;
           height: 100%;
-          overscroll-behavior: none;
+          background: #000;
         }
 
         #chat-master-container {
           position: fixed;
           top: 0; left: 0; width: 100%;
+          /* YAHAN MAGIC HAI: CSS Variable use ho raha hai */
+          height: var(--vh);
           display: flex;
           flex-direction: column;
           background: #050505;
           z-index: 100;
           overflow: hidden;
-          /* Layout Shift ko smooth banane ke liye */
-          transition: height 0.1s ease-out;
+          /* GPU Acceleration */
+          will-change: height;
+          transition: height 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
         }
 
         .cyber-grid {
@@ -145,11 +149,11 @@ const ChatBox = () => {
         </div>
       )}
 
-      <div id="chat-master-container" ref={containerRef} style={{ fontFamily: config?.font }}>
+      <div id="chat-master-container" style={{ fontFamily: config?.font }}>
         <div className="cyber-grid" />
         <div className="aura-sphere" />
 
-        {/* --- FIXED HEADER (Top Par Chipka Hua) --- */}
+        {/* HEADER */}
         <div className="flex-shrink-0 w-full h-[70px] flex items-center justify-between px-5 bg-black/80 backdrop-blur-3xl border-b border-white/5 z-[150]">
           <div className="flex items-center gap-4">
             <button onClick={() => setSelectedChat(null)} className="p-1 md:hidden" style={{ color: accentColor }}> ← </button>
@@ -164,16 +168,9 @@ const ChatBox = () => {
             </div>
           </div>
           <button onClick={() => setShowMenu(!showMenu)} className="p-2 text-zinc-600 hover:text-white"> ⋮ </button>
-          
-          {showMenu && (
-            <div className="absolute right-5 top-16 w-48 bg-[#0a0a0a]/95 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl z-[160] overflow-hidden">
-              <button onClick={openProfile} className="w-full px-5 py-4 text-left text-[10px] font-black text-white uppercase border-b border-white/5 hover:bg-white/5">Identity</button>
-              <button className="w-full px-5 py-4 text-left text-[10px] font-black text-red-500 uppercase hover:bg-red-500/5">Terminate</button>
-            </div>
-          )}
         </div>
 
-        {/* --- CHAT AREA --- */}
+        {/* CHAT AREA */}
         <div className="flex-1 overflow-y-auto px-5 py-6 space-y-7 relative z-10 custom-scrollbar">
           {messages.map((m) => {
             const isMine = (m.sender?._id || m.sender) === (user?.user?._id || user?._id);
@@ -195,7 +192,7 @@ const ChatBox = () => {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* --- INPUT AREA (Ye keyboard ke upar automatic stick hoga) --- */}
+        {/* INPUT */}
         <div className="flex-shrink-0 p-5 bg-black/40 backdrop-blur-3xl border-t border-white/5 z-20">
           <div className="flex items-center gap-3 bg-white/[0.04] border border-white/10 pl-6 pr-2 py-2 rounded-[28px]">
             <input
