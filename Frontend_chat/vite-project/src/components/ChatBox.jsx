@@ -86,7 +86,7 @@ const ChatBox = () => {
     if (!window.confirm(`Are you sure you want to block ${receiver.name}?`)) return;
     try {
       // Yahan hum block api call kar rahe hain
-      await API.post("/api/blockuser", { userId: receiver._id }, getAuthHeader());
+      await API.post("/api/blockuser", { userblockid: receiver._id }, getAuthHeader());
       alert("User Blocked Successfully");
       setSelectedChat(null); // Chat close kardo block ke baad
     } catch (err) {
