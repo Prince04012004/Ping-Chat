@@ -11,31 +11,10 @@ const ChatBox = () => {
   const [showMenu, setShowMenu] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [profileUser, setProfileUser] = useState(null);
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   const accentColor = config?.accent || "#10b981";
   const chatAreaRef = useRef(null);
   const messagesEndRef = useRef(null);
-
-  useEffect(() => {
-    const update = () => {
-      if (!window.visualViewport) return;
-      const vv = window.visualViewport;
-      // Keyboard height = window se jo hissa keyboard ne le liya
-      const kbHeight = window.innerHeight - vv.height - vv.offsetTop;
-      setKeyboardHeight(Math.max(0, kbHeight));
-      setTimeout(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-      }, 50);
-    };
-
-    window.visualViewport?.addEventListener("resize", update);
-    window.visualViewport?.addEventListener("scroll", update);
-    return () => {
-      window.visualViewport?.removeEventListener("resize", update);
-      window.visualViewport?.removeEventListener("scroll", update);
-    };
-  }, []);
 
   const scrollToBottom = (force = false) => {
     if (!chatAreaRef.current) return;
@@ -86,14 +65,12 @@ const ChatBox = () => {
 
   const receiver = selectedChat.users?.find((u) => u._id !== user?.user?._id) || {};
 
-  const HEADER_H = 70;
-  const FOOTER_H = 80;
-
   return (
     <>
       <style>{`
         html, body {
           overflow: hidden !important;
+          height: 100%;
           background: #000;
         }
 
@@ -113,18 +90,19 @@ const ChatBox = () => {
         </div>
       )}
 
-      <div className="fixed inset-0 bg-[#050505]" style={{ zIndex: 100 }}>
+      {/* 
+        index.html mein interactive-widget=resizes-content hai,
+        isliye ab browser khud viewport ko keyboard ke saath resize karta hai.
+        100dvh = dynamic viewport height — keyboard ke saath shrink hoga automatically.
+      */}
+      <div
+        className="flex flex-col bg-[#050505]"
+        style={{ height: "100dvh", position: "relative", zIndex: 100, overflow: "hidden" }}
+      >
         <div className="cyber-grid" />
 
-        {/* ✅ HEADER — top:0 fixed, hamesha visible */}
-        <header
-          className="fixed left-0 right-0 flex items-center justify-between px-5 bg-black/80 backdrop-blur-3xl border-b border-white/5"
-          style={{
-            top: 0,
-            height: `${HEADER_H}px`,
-            zIndex: 150,
-          }}
-        >
+        {/* HEADER */}
+        <header className="flex-shrink-0 w-full h-[70px] flex items-center justify-between px-5 bg-black/80 backdrop-blur-3xl border-b border-white/5 relative z-[150]">
           <div className="flex items-center gap-4">
             <button
               onClick={() => setSelectedChat(null)}
@@ -155,16 +133,10 @@ const ChatBox = () => {
           </button>
         </header>
 
-        {/* ✅ CHAT AREA — header ke neeche se footer ke upar tak */}
+        {/* CHAT AREA */}
         <main
           ref={chatAreaRef}
-          className="fixed left-0 right-0 overflow-y-auto px-5 py-6 space-y-7"
-          style={{
-            top: `${HEADER_H}px`,
-            // keyboard open ho toh footer upar uthta hai, chat area bhi shrink ho
-            bottom: `${FOOTER_H + keyboardHeight}px`,
-            zIndex: 10,
-          }}
+          className="flex-1 overflow-y-auto px-5 py-6 space-y-7 relative z-10 min-h-0"
         >
           {messages.map((m) => {
             const isMine = (m.sender?._id || m.sender) === (user?.user?._id || user?._id);
@@ -188,22 +160,15 @@ const ChatBox = () => {
           <div ref={messagesEndRef} />
         </main>
 
-        {/* ✅ FOOTER — keyboard ke bilkul upar, koi gap nahi */}
-        <footer
-          className="fixed left-0 right-0 p-4 bg-black/40 backdrop-blur-3xl border-t border-white/5"
-          style={{
-            bottom: `${keyboardHeight}px`,
-            height: `${FOOTER_H}px`,
-            zIndex: 20,
-          }}
-        >
-          <div className="flex items-center gap-3 bg-white/[0.04] border border-white/10 pl-6 pr-2 py-2 rounded-[28px] h-full">
+        {/* FOOTER */}
+        <footer className="flex-shrink-0 p-4 bg-black/40 backdrop-blur-3xl border-t border-white/5 relative z-20">
+          <div className="flex items-center gap-3 bg-white/[0.04] border border-white/10 pl-6 pr-2 py-2 rounded-[28px]">
             <input
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && sendMessage()}
               placeholder="Inject signal..."
-              className="flex-1 bg-transparent outline-none text-white"
+              className="flex-1 bg-transparent outline-none text-white py-2"
               style={{ fontSize: "16px" }}
             />
             <button
