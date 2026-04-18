@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { ChatState } from "../Context/ChatProvider";
 import API from "../services/api";
 import ProfileModal from "../pages/Profile";
@@ -11,87 +11,53 @@ const ChatBox = () => {
   const [showMenu, setShowMenu] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [profileUser, setProfileUser] = useState(null);
-  const accentColor = config?.accent || "#10b981";
+  const [footerBottom, setFooterBottom] = useState(0);
+  const [chatPaddingBottom, setChatPaddingBottom] = useState(80);
 
+  const accentColor = config?.accent || "#10b981";
   const chatAreaRef = useRef(null);
   const messagesEndRef = useRef(null);
-  const containerRef = useRef(null);
-  const footerRef = useRef(null);
-  const rafRef = useRef(null);
 
-  // ✅ KEYBOARD FIX: Visual Viewport ke saath frame-perfect sync
+  // ✅ KEY FIX: visualViewport se footer ko keyboard ke saath move karo
   useEffect(() => {
-    if (!window.visualViewport) return;
+    const FOOTER_HEIGHT = 90; // footer ki approximate height
 
-    const handleViewportChange = () => {
-      // Previous RAF cancel karo taaki ek hi frame mein update ho
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    const handleViewport = () => {
+      if (!window.visualViewport) return;
 
-      rafRef.current = requestAnimationFrame(() => {
-        const vv = window.visualViewport;
-        if (!containerRef.current) return;
+      const vv = window.visualViewport;
+      const windowHeight = window.innerHeight;
 
-        const offsetTop = vv.offsetTop || 0;
-        const height = vv.height;
+      // Kitna keyboard ne upar push kiya
+      const keyboardHeight = windowHeight - vv.height - vv.offsetTop;
 
-        // Container ko exact viewport ke andar fit karo
-        containerRef.current.style.top = `${offsetTop}px`;
-        containerRef.current.style.height = `${height}px`;
+      // Footer ko keyboard ke bilkul upar rakho
+      const newBottom = Math.max(0, keyboardHeight);
+      setFooterBottom(newBottom);
+      setChatPaddingBottom(FOOTER_HEIGHT + newBottom);
 
-        // Scroll to bottom when keyboard opens (input focus ke baad)
-        scrollToBottom(true);
-      });
+      // Scroll to bottom
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      }, 50);
     };
 
-    window.visualViewport.addEventListener("resize", handleViewportChange);
-    window.visualViewport.addEventListener("scroll", handleViewportChange);
-
-    // Initial call
-    handleViewportChange();
+    window.visualViewport?.addEventListener("resize", handleViewport);
+    window.visualViewport?.addEventListener("scroll", handleViewport);
 
     return () => {
-      window.visualViewport.removeEventListener("resize", handleViewportChange);
-      window.visualViewport.removeEventListener("scroll", handleViewportChange);
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      window.visualViewport?.removeEventListener("resize", handleViewport);
+      window.visualViewport?.removeEventListener("scroll", handleViewport);
     };
   }, []);
 
-  // Body scroll lock — page ko keyboard ke saath move hone se rokta hai
-  useEffect(() => {
-    const originalStyle = {
-      overflow: document.body.style.overflow,
-      position: document.body.style.position,
-      width: document.body.style.width,
-      height: document.body.style.height,
-    };
-
-    document.body.style.overflow = "hidden";
-    document.body.style.position = "fixed";
-    document.body.style.width = "100%";
-    document.body.style.height = "100%";
-    document.documentElement.style.overflow = "hidden";
-
-    return () => {
-      document.body.style.overflow = originalStyle.overflow;
-      document.body.style.position = originalStyle.position;
-      document.body.style.width = originalStyle.width;
-      document.body.style.height = originalStyle.height;
-      document.documentElement.style.overflow = "";
-    };
-  }, []);
-
-  const scrollToBottom = useCallback((force = false) => {
+  const scrollToBottom = (force = false) => {
     if (!chatAreaRef.current) return;
     const { scrollTop, scrollHeight, clientHeight } = chatAreaRef.current;
-    const isNearBottom = scrollHeight - scrollTop - clientHeight < 200;
-
-    if (force || isNearBottom) {
-      // requestAnimationFrame se smooth aur reliable scroll
-      requestAnimationFrame(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-      });
+    if (force || scrollHeight - scrollTop - clientHeight < 200) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }
-  }, []);
+  };
 
   useEffect(() => {
     scrollToBottom();
@@ -115,21 +81,6 @@ const ChatBox = () => {
       setTimeout(() => scrollToBottom(true), 50);
     } catch (err) {
       console.error(err);
-    }
-  };
-
-  const handleInputFocus = () => {
-    // iOS Safari mein focus ke baad scroll reset chahiye
-    setTimeout(() => {
-      window.scrollTo(0, 0);
-      scrollToBottom(true);
-    }, 300); // Keyboard animation ke baad
-  };
-
-  const handleKeyDown = (e) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
     }
   };
 
@@ -159,73 +110,17 @@ const ChatBox = () => {
   return (
     <>
       <style>{`
-        /* ✅ Global scroll lock — keyboard ke saath page shift nahi hoga */
-        html {
+        html, body {
           overflow: hidden !important;
-          overscroll-behavior: none !important;
-        }
-        body {
-          overflow: hidden !important;
-          position: fixed !important;
-          width: 100% !important;
-          height: 100% !important;
-          overscroll-behavior: none !important;
+          height: 100%;
           background: #000;
         }
 
-        /* ✅ Master container — Visual Viewport se JS control karega */
-        #chat-master-container {
-          position: fixed;
-          top: 0;
-          left: 0;
-          width: 100%;
-          /* height JS se set hogi — visualViewport.height */
-          display: flex;
-          flex-direction: column;
-          background: #050505;
-          z-index: 100;
-          overflow: hidden;
-          /* Transition NAHI — flickering hogi */
-        }
-
-        /* Chat area flexible stretch karega header + footer ke beech */
-        #chat-scroll-area {
-          flex: 1;
-          overflow-y: auto;
-          overflow-x: hidden;
-          -webkit-overflow-scrolling: touch;
-          overscroll-behavior-y: contain;
-          /* min-height: 0 zaroori hai flex child scroll ke liye */
-          min-height: 0;
-        }
-
-        /* Footer kabhi shrink nahi hoga */
-        #chat-footer {
-          flex-shrink: 0;
-        }
-
-        /* Header kabhi shrink nahi hoga */
-        #chat-header {
-          flex-shrink: 0;
-        }
-
         .cyber-grid {
-          position: absolute;
-          inset: 0;
-          background-image: 
-            linear-gradient(${hexToRGBA(accentColor, 0.05)} 1px, transparent 1px),
-            linear-gradient(90deg, ${hexToRGBA(accentColor, 0.05)} 1px, transparent 1px);
-          background-size: 45px 45px;
-          opacity: 0.4;
-          z-index: 0;
-          pointer-events: none;
-        }
-
-        .custom-scrollbar::-webkit-scrollbar { width: 3px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { 
-          background: ${hexToRGBA(accentColor, 0.3)}; 
-          border-radius: 10px; 
+          position: absolute; inset: 0;
+          background-image: linear-gradient(${hexToRGBA(accentColor, 0.05)} 1px, transparent 1px),
+                            linear-gradient(90deg, ${hexToRGBA(accentColor, 0.05)} 1px, transparent 1px);
+          background-size: 45px 45px; opacity: .4; z-index: 0; pointer-events: none;
         }
       `}</style>
 
@@ -239,14 +134,12 @@ const ChatBox = () => {
         </div>
       )}
 
-      <div id="chat-master-container" ref={containerRef}>
+      {/* Main container */}
+      <div className="fixed inset-0 flex flex-col bg-[#050505]" style={{ zIndex: 100 }}>
         <div className="cyber-grid" />
 
-        {/* ✅ HEADER — fixed height, never shrinks */}
-        <header
-          id="chat-header"
-          className="w-full h-[70px] flex items-center justify-between px-5 bg-black/80 backdrop-blur-3xl border-b border-white/5 z-[150] relative"
-        >
+        {/* HEADER */}
+        <header className="flex-shrink-0 w-full h-[70px] flex items-center justify-between px-5 bg-black/80 backdrop-blur-3xl border-b border-white/5 z-[150] relative">
           <div className="flex items-center gap-4">
             <button
               onClick={() => setSelectedChat(null)}
@@ -280,71 +173,49 @@ const ChatBox = () => {
           </button>
         </header>
 
-        {/* ✅ CHAT AREA — flex:1 se grow karega, min-height:0 se scroll kaam karega */}
+        {/* CHAT AREA */}
         <main
-          id="chat-scroll-area"
           ref={chatAreaRef}
-          className="px-5 py-6 space-y-7 relative z-10 custom-scrollbar"
+          className="flex-1 overflow-y-auto px-5 pt-6 space-y-7 relative z-10"
+          style={{ paddingBottom: `${chatPaddingBottom}px` }}
         >
-          {loading ? (
-            <div className="flex items-center justify-center h-full">
-              <div
-                className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin"
-                style={{ borderColor: accentColor }}
-              />
-            </div>
-          ) : (
-            messages.map((m) => {
-              const isMine =
-                (m.sender?._id || m.sender) ===
-                (user?.user?._id || user?._id);
-              return (
+          {messages.map((m) => {
+            const isMine =
+              (m.sender?._id || m.sender) === (user?.user?._id || user?._id);
+            return (
+              <div key={m._id} className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
                 <div
-                  key={m._id}
-                  className={`flex ${isMine ? "justify-end" : "justify-start"}`}
+                  className="max-w-[82%] px-5 py-3.5 text-[14.5px] leading-relaxed"
+                  style={{
+                    borderRadius: isMine ? "24px 24px 4px 24px" : "24px 24px 24px 4px",
+                    backgroundColor: isMine
+                      ? hexToRGBA(accentColor, 0.18)
+                      : "rgba(255,255,255,0.04)",
+                    color: "#fff",
+                    border: `1px solid ${isMine ? hexToRGBA(accentColor, 0.3) : "rgba(255,255,255,0.08)"}`,
+                    backdropFilter: "blur(15px)",
+                  }}
                 >
-                  <div
-                    className="max-w-[82%] px-5 py-3.5 text-[14.5px] leading-relaxed"
-                    style={{
-                      borderRadius: isMine
-                        ? "24px 24px 4px 24px"
-                        : "24px 24px 24px 4px",
-                      backgroundColor: isMine
-                        ? hexToRGBA(accentColor, 0.18)
-                        : "rgba(255,255,255,0.04)",
-                      color: "#fff",
-                      border: `1px solid ${
-                        isMine
-                          ? hexToRGBA(accentColor, 0.3)
-                          : "rgba(255,255,255,0.08)"
-                      }`,
-                      backdropFilter: "blur(15px)",
-                    }}
-                  >
-                    {m.content}
-                  </div>
+                  {m.content}
                 </div>
-              );
-            })
-          )}
+              </div>
+            );
+          })}
           <div ref={messagesEndRef} />
         </main>
 
-        {/* ✅ FOOTER — keyboard ke upar stick karta hai */}
-        <footer
-          id="chat-footer"
-          ref={footerRef}
-          className="p-5 bg-black/40 backdrop-blur-3xl border-t border-white/5 z-20 relative"
+        {/* ✅ FOOTER — fixed, keyboard ke saath upar uthta hai */}
+        <div
+          className="fixed left-0 right-0 p-5 bg-black/40 backdrop-blur-3xl border-t border-white/5 z-20"
+          style={{ bottom: `${footerBottom}px` }}
         >
           <div className="flex items-center gap-3 bg-white/[0.04] border border-white/10 pl-6 pr-2 py-2 rounded-[28px]">
             <input
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
-              onKeyDown={handleKeyDown}
-              onFocus={handleInputFocus}
+              onKeyDown={(e) => e.key === "Enter" && sendMessage()}
               placeholder="Inject signal..."
-              className="flex-1 bg-transparent outline-none text-[14px] text-white py-2"
-              // ✅ iOS zoom prevent karta hai (font-size 16px se kam ho toh zoom hota hai)
+              className="flex-1 bg-transparent outline-none text-white py-2"
               style={{ fontSize: "16px" }}
             />
             <button
@@ -355,7 +226,7 @@ const ChatBox = () => {
               ➤
             </button>
           </div>
-        </footer>
+        </div>
       </div>
     </>
   );
