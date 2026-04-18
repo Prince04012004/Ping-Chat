@@ -69,7 +69,6 @@ const ChatBox = () => {
 
   const handleBlockUser = async () => {
     setShowMenu(false);
-    // Block logic yahan add karo agar API hai
     alert(`${receiver.name} blocked!`);
   };
 
@@ -80,16 +79,6 @@ const ChatBox = () => {
           overflow: hidden !important; 
           height: 100%; 
           background: #000;
-        }
-
-        #chat-master-container {
-          display: flex;
-          flex-direction: column;
-          /* ✅ FIX: 100dvh keyboard ke saath shrink hoga automatically (index.html mein interactive-widget=resizes-content hai) */
-          height: 100dvh;
-          background: #050505;
-          position: relative;
-          overflow: hidden;
         }
 
         .cyber-grid { 
@@ -110,7 +99,11 @@ const ChatBox = () => {
         </div>
       )}
 
-      <div id="chat-master-container">
+      {/* ✅ w-full + h-full: parent ke andar poori jagah lo, 100dvh nahi — Chatpage already handle kar raha hai height */}
+      <div
+        className="flex flex-col bg-[#050505] w-full h-full relative overflow-hidden"
+        style={{ zIndex: 100 }}
+      >
         <div className="cyber-grid" />
 
         {/* HEADER */}
@@ -133,10 +126,7 @@ const ChatBox = () => {
 
             {showMenu && (
               <>
-                {/* Backdrop to close menu */}
                 <div className="fixed inset-0 z-[190]" onClick={() => setShowMenu(false)} />
-
-                {/* Dropdown */}
                 <div
                   className="absolute right-0 top-[110%] w-48 rounded-2xl overflow-hidden z-[200]"
                   style={{
