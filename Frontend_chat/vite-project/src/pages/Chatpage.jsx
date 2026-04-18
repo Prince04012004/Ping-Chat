@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import MyChats from "../components/MyChats"; 
-import ChatBox from "../components/ChatBox";
+import SingleChat from "../components/Singlechat"; // ✅ ChatBox → SingleChat
 import { ChatState } from "../Context/ChatProvider";
 
 const Chatpage = () => {
@@ -25,17 +25,17 @@ const Chatpage = () => {
 
             <div className="relative w-full h-full max-w-[1600px] flex bg-white/[0.01] backdrop-blur-3xl border border-white/10 md:rounded-[40px] overflow-hidden shadow-[0_0_100px_rgba(0,0,0,0.5)]">
 
-                {/* Left Side: MyChats — mobile par hidden jab chat open ho */}
+                {/* Left Side: MyChats */}
                 <div className={`${selectedChat ? "hidden" : "flex"} md:flex w-full md:w-[350px] lg:w-[400px] h-full border-r border-white/5 flex-col bg-black/20 shrink-0`}>
                     <div className="flex-1 overflow-y-auto custom-scrollbar">
                         <MyChats fetchAgain={fetchagain} />
                     </div>
                 </div>
 
-                {/* Right Side: ChatBox — mobile par full width */}
+                {/* Right Side: SingleChat (socket wala) */}
                 <div className={`${!selectedChat ? "hidden" : "flex"} md:flex flex-1 w-full h-full overflow-hidden`}>
                     {user && (
-                        <ChatBox fetchagain={fetchagain} setfetchagain={setfetchagain} />
+                        <SingleChat fetchagain={fetchagain} setfetchagain={setfetchagain} />
                     )}
                 </div>
             </div>
