@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from "react";
 import API from "../services/api";
 import io from "socket.io-client";
 import { ChatState } from "../Context/ChatProvider";
+import ProfileModal from "../pages/Profile";
 
 const ENDPOINT = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
 let socketInstance = null;
@@ -11,6 +12,8 @@ const SingleChat = () => {
     const [newmessage, setnewmessage] = useState("");
     const [typing, setTyping] = useState(false);
     const [istyping, setIsTyping] = useState(false);
+    const [showMenu, setShowMenu] = useState(false);
+    const [isProfileOpen, setIsProfileOpen] = useState(false);
     const messagesEndRef = useRef(null);
     const containerRef = useRef(null);
     const selectedChatRef = useRef(null);
@@ -19,7 +22,6 @@ const SingleChat = () => {
     const accentColor = config?.accent || "#10b981";
     const myId = user?.user?._id || user?._id;
 
-    // ✅ Auth header — token har API call mein
     const getAuthHeader = () => {
         const token = user?.token || localStorage.getItem("token");
         return { headers: { Authorization: `Bearer ${token}` } };
@@ -73,14 +75,14 @@ const SingleChat = () => {
         };
     }, [user]);
 
-    // ✅ FETCH MESSAGES + JOIN ROOM — with auth
+    // ✅ FETCH MESSAGES
     useEffect(() => {
         if (!selectedChat?._id) return;
         const getmessages = async () => {
             try {
                 const { data } = await API.get(
                     `/api/allmessages/${selectedChat._id}`,
-                    getAuthHeader() // ✅ token
+                    getAuthHeader()
                 );
                 setmessages(data);
                 socketInstance?.emit("join chat", selectedChat._id);
@@ -91,7 +93,7 @@ const SingleChat = () => {
 
     useEffect(() => { scrollToBottom(); }, [messages, istyping]);
 
-    // ✅ SEND MESSAGE — with auth
+    // ✅ SEND MESSAGE
     const sendMessage = async (event) => {
         if ((event.key === "Enter" || event.type === "click") && newmessage.trim()) {
             socketInstance?.emit("stop typing", selectedChat._id);
@@ -101,7 +103,7 @@ const SingleChat = () => {
                 const { data } = await API.post(
                     "/api/sendmessage",
                     { content, chatid: selectedChat._id },
-                    getAuthHeader() // ✅ token
+                    getAuthHeader()
                 );
                 socketInstance?.emit("new message", data);
                 setmessages((prev) => [...prev, data]);
@@ -109,7 +111,7 @@ const SingleChat = () => {
         }
     };
 
-    // ✅ TYPING HANDLER
+    // ✅ TYPING
     const typingHandler = (e) => {
         setnewmessage(e.target.value);
         if (!typing) {
@@ -123,6 +125,17 @@ const SingleChat = () => {
                 setTyping(false);
             }
         }, 3000);
+    };
+
+    // ✅ BLOCK USER
+    const handleBlockUser = async () => {
+        if (!window.confirm(`Block ${otherUser?.name}?`)) return;
+        try {
+            await API.post("/api/blockuser", { userblockid: otherUser._id }, getAuthHeader());
+            alert("User Blocked Successfully");
+            setSelectedChat(null);
+        } catch (err) { alert("Failed to block user"); }
+        setShowMenu(false);
     };
 
     if (!selectedChat) {
@@ -203,7 +216,21 @@ const SingleChat = () => {
                 .typing-dot:nth-child(1) { animation: typingPulse 1.2s ease infinite 0s; }
                 .typing-dot:nth-child(2) { animation: typingPulse 1.2s ease infinite 0.2s; }
                 .typing-dot:nth-child(3) { animation: typingPulse 1.2s ease infinite 0.4s; }
+
+                .menu-item { transition: background 0.15s; }
+                .menu-item:hover { background: rgba(255,255,255,0.04); }
             `}</style>
+
+            {/* Profile Modal */}
+            {isProfileOpen && (
+                <div className="fixed inset-0 z-[2000] flex items-center justify-center">
+                    <ProfileModal
+                        isOpen={isProfileOpen}
+                        onClose={() => setIsProfileOpen(false)}
+                        user={otherUser}
+                    />
+                </div>
+            )}
 
             <div id="sc-container" ref={containerRef}>
                 <div className="sc-bg" />
@@ -216,6 +243,7 @@ const SingleChat = () => {
                     <div className="flex items-center justify-between px-4 py-3"
                         style={{ background: "rgba(6,6,8,0.9)", backdropFilter: "blur(24px)" }}>
 
+                        {/* Left — back + user */}
                         <div className="flex items-center gap-3">
                             <button onClick={() => setSelectedChat(null)}
                                 className="md:hidden w-8 h-8 flex items-center justify-center rounded-xl active:scale-90 transition-all"
@@ -255,11 +283,56 @@ const SingleChat = () => {
                             </div>
                         </div>
 
-                        <div className="w-9 h-9 flex items-center justify-center rounded-xl text-white/20"
-                            style={{ background: "rgba(255,255,255,0.04)" }}>
-                            <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
-                                <circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/>
-                            </svg>
+                        {/* Right — 3 dots menu */}
+                        <div className="relative">
+                            <button onClick={() => setShowMenu(!showMenu)}
+                                className="w-9 h-9 flex items-center justify-center rounded-xl transition-colors"
+                                style={{ background: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.4)" }}>
+                                <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+                                    <circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/>
+                                </svg>
+                            </button>
+
+                            {showMenu && (
+                                <>
+                                    <div className="fixed inset-0 z-[190]" onClick={() => setShowMenu(false)} />
+                                    <div className="absolute right-0 top-[calc(100%+8px)] w-52 rounded-2xl z-[200] overflow-hidden"
+                                        style={{
+                                            background: "rgba(10,10,14,0.97)",
+                                            border: `1px solid ${accentColor}25`,
+                                            backdropFilter: "blur(24px)",
+                                            boxShadow: `0 16px 48px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04)`
+                                        }}>
+                                        {/* View Identity */}
+                                        <button
+                                            onClick={() => { setIsProfileOpen(true); setShowMenu(false); }}
+                                            className="menu-item w-full flex items-center gap-3 px-4 py-3.5 text-left"
+                                            style={{ borderBottom: `1px solid rgba(255,255,255,0.05)` }}>
+                                            <div className="w-7 h-7 rounded-lg flex items-center justify-center"
+                                                style={{ background: `${accentColor}18` }}>
+                                                <svg width="13" height="13" fill="none" viewBox="0 0 24 24">
+                                                    <circle cx="12" cy="8" r="4" stroke={accentColor} strokeWidth="1.5"/>
+                                                    <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke={accentColor} strokeWidth="1.5" strokeLinecap="round"/>
+                                                </svg>
+                                            </div>
+                                            <span className="text-[12px] text-white/70 font-semibold">View Identity</span>
+                                        </button>
+
+                                        {/* Terminate Connection */}
+                                        <button
+                                            onClick={handleBlockUser}
+                                            className="menu-item w-full flex items-center gap-3 px-4 py-3.5 text-left">
+                                            <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-red-500/10">
+                                                <svg width="13" height="13" fill="none" viewBox="0 0 24 24">
+                                                    <circle cx="12" cy="12" r="9" stroke="#ef4444" strokeWidth="1.5"/>
+                                                    <path d="M6 6l12 12" stroke="#ef4444" strokeWidth="1.5" strokeLinecap="round"/>
+                                                </svg>
+                                            </div>
+                                            <span className="text-[12px] text-red-400 font-bold">Terminate Connection</span>
+                                        </button>
+                                    </div>
+                                </>
+                            )}
                         </div>
                     </div>
                 </header>
