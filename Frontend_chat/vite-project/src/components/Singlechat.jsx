@@ -4,7 +4,9 @@ import io from "socket.io-client";
 import { ChatState } from "../Context/ChatProvider";
 
 const ENDPOINT = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
-var socket, selectedchatcompare;
+
+// ✅ socket bhi ref mein rakhenge — global var avoid karo
+let socketInstance = null;
 
 const SingleChat = () => {
     const [messages, setmessages] = useState([]);
@@ -14,11 +16,17 @@ const SingleChat = () => {
     const messagesEndRef = useRef(null);
     const containerRef = useRef(null);
 
+    // ✅ KEY FIX: var ki jagah useRef — React re-renders ke saath sync rehta hai
+    const selectedChatRef = useRef(null);
+
     const { user, selectedChat, setSelectedChat, notification, setNotification, config, hexToRGBA } = ChatState();
     const accentColor = config?.accent || "#10b981";
-
-    // ✅ User ID — context structure handle karo
     const myId = user?.user?._id || user?._id;
+
+    // ✅ Jab bhi selectedChat change ho, ref update karo
+    useEffect(() => {
+        selectedChatRef.current = selectedChat;
+    }, [selectedChat]);
 
     // ✅ KEYBOARD FIX
     useEffect(() => {
@@ -37,68 +45,66 @@ const SingleChat = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     };
 
-    // ✅ SOCKET SETUP
+    // ✅ SOCKET SETUP — ek baar
     useEffect(() => {
-        socket = io(ENDPOINT);
-        socket.emit("setup", user);
-        socket.on("connected", () => console.log("Socket Connected!"));
-        socket.on("typing", () => setIsTyping(true));
-        socket.on("stop typing", () => setIsTyping(false));
-        return () => { socket.disconnect(); };
-    }, [user]);
+        if (!user) return;
+        socketInstance = io(ENDPOINT);
+        socketInstance.emit("setup", user);
+        socketInstance.on("connected", () => console.log("✅ Socket Connected"));
+        socketInstance.on("typing", () => setIsTyping(true));
+        socketInstance.on("stop typing", () => setIsTyping(false));
+
+        // ✅ message received YAHAN rakho — socket setup ke saath
+        socketInstance.on("message received", (newMsg) => {
+            const currentChat = selectedChatRef.current;
+
+            if (!currentChat || currentChat._id !== newMsg.chat._id) {
+                // Dusri chat ka message — notification mein
+                setNotification((prev) => {
+                    if (prev.some((n) => n._id === newMsg._id)) return prev;
+                    return [newMsg, ...prev];
+                });
+            } else {
+                // ✅ Same chat — seedha add karo
+                setmessages((prev) => [...prev, newMsg]);
+            }
+        });
+
+        return () => {
+            socketInstance.disconnect();
+            socketInstance = null;
+        };
+    }, [user]); // sirf user change hone par reconnect
 
     // ✅ FETCH MESSAGES + JOIN ROOM
     useEffect(() => {
-        if (!selectedChat) return;
+        if (!selectedChat?._id) return;
         const getmessages = async () => {
             try {
                 const { data } = await API.get(`/api/allmessages/${selectedChat._id}`);
                 setmessages(data);
-                socket.emit("join chat", selectedChat._id);
-            } catch (err) { console.log("Message fetch error"); }
+                socketInstance?.emit("join chat", selectedChat._id);
+            } catch (err) { console.log("Message fetch error", err); }
         };
         getmessages();
-        selectedchatcompare = selectedChat;
-    }, [selectedChat]);
-
-    // ✅ LIVE MESSAGE RECEIVE — FIXED
-    useEffect(() => {
-        if (!socket) return;
-
-        socket.on("message received", (newMessageReceived) => {
-            if (
-                !selectedchatcompare ||
-                selectedchatcompare._id !== newMessageReceived.chat._id
-            ) {
-                // Dusri chat ka message — notification mein daalo
-                if (!notification.some((n) => n._id === newMessageReceived._id)) {
-                    setNotification([newMessageReceived, ...notification]);
-                }
-            } else {
-                // ✅ Same chat open hai — seedha dikhao, koi check nahi
-                setmessages((prev) => [...prev, newMessageReceived]);
-            }
-        });
-
-        return () => socket.off("message received");
-    }, [notification, setNotification]);
+    }, [selectedChat?._id]);
 
     useEffect(() => { scrollToBottom(); }, [messages, istyping]);
 
     // ✅ SEND MESSAGE
     const sendMessage = async (event) => {
-        if ((event.key === "Enter" || event.type === "click") && newmessage) {
-            socket.emit("stop typing", selectedChat._id);
+        if ((event.key === "Enter" || event.type === "click") && newmessage.trim()) {
+            socketInstance?.emit("stop typing", selectedChat._id);
             try {
                 const content = newmessage;
                 setnewmessage("");
                 const { data } = await API.post("/api/sendmessage", {
-                    content: content,
+                    content,
                     chatid: selectedChat._id
                 });
-                socket.emit("new message", data);
-                setmessages((prev) => [...prev, data]); // ✅ functional update
-            } catch (err) { console.log("Message sending error"); }
+                socketInstance?.emit("new message", data);
+                setmessages((prev) => [...prev, data]);
+            } catch (err) { console.log("Send error", err); }
         }
     };
 
@@ -107,13 +113,12 @@ const SingleChat = () => {
         setnewmessage(e.target.value);
         if (!typing) {
             setTyping(true);
-            socket.emit("typing", selectedChat._id);
+            socketInstance?.emit("typing", selectedChat._id);
         }
-        let lastTypingTime = new Date().getTime();
+        const lastTypingTime = new Date().getTime();
         setTimeout(() => {
-            var timeNow = new Date().getTime();
-            if (timeNow - lastTypingTime >= 3000 && typing) {
-                socket.emit("stop typing", selectedChat._id);
+            if (new Date().getTime() - lastTypingTime >= 3000 && typing) {
+                socketInstance?.emit("stop typing", selectedChat._id);
                 setTyping(false);
             }
         }, 3000);
@@ -128,7 +133,6 @@ const SingleChat = () => {
         );
     }
 
-    // ✅ FIXED: myId use karo
     const otherUser = selectedChat.users?.find(u => u._id !== myId) || {};
 
     const formatTime = (dateStr) => {
@@ -203,7 +207,7 @@ const SingleChat = () => {
             <div id="sc-container" ref={containerRef}>
                 <div className="sc-bg" />
 
-                {/* ═══ HEADER ═══ */}
+                {/* HEADER */}
                 <header className="flex-shrink-0 relative z-[150]"
                     style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
                     <div className="absolute top-0 left-0 right-0 h-[1px]"
@@ -250,20 +254,16 @@ const SingleChat = () => {
                             </div>
                         </div>
 
-                        {/* 3 dots menu */}
-                        <div className="relative">
-                            <button
-                                className="w-9 h-9 flex items-center justify-center rounded-xl text-white/30 hover:text-white/70 transition-colors"
-                                style={{ background: "rgba(255,255,255,0.04)" }}>
-                                <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
-                                    <circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/>
-                                </svg>
-                            </button>
+                        <div className="w-9 h-9 flex items-center justify-center rounded-xl text-white/20"
+                            style={{ background: "rgba(255,255,255,0.04)" }}>
+                            <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+                                <circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/>
+                            </svg>
                         </div>
                     </div>
                 </header>
 
-                {/* ═══ MESSAGES ═══ */}
+                {/* MESSAGES */}
                 <main className="sc-messages px-4 py-5 relative z-10">
                     {Object.entries(groupedMessages).map(([date, msgs]) => (
                         <div key={date}>
@@ -278,7 +278,6 @@ const SingleChat = () => {
 
                             <div className="space-y-1.5">
                                 {msgs.map((m, i) => {
-                                    // ✅ FIXED: myId se compare karo
                                     const isMine = (m.sender?._id || m.sender) === myId;
                                     const prevMsg = msgs[i - 1];
                                     const isSameSender = prevMsg &&
@@ -332,7 +331,7 @@ const SingleChat = () => {
                     <div ref={messagesEndRef} />
                 </main>
 
-                {/* ═══ INPUT ═══ */}
+                {/* INPUT */}
                 <footer className="flex-shrink-0 px-4 py-3 relative z-20"
                     style={{ background: "rgba(6,6,8,0.9)", backdropFilter: "blur(24px)", borderTop: "1px solid rgba(255,255,255,0.05)" }}>
                     <div className="flex items-center gap-2.5 px-4 py-2 rounded-[24px]"
@@ -350,7 +349,9 @@ const SingleChat = () => {
                             disabled={!newmessage.trim()}
                             className="w-10 h-10 flex items-center justify-center rounded-[14px] flex-shrink-0 transition-all active:scale-90 disabled:opacity-30"
                             style={{
-                                background: newmessage.trim() ? `linear-gradient(135deg, ${accentColor}, ${accentColor}bb)` : "rgba(255,255,255,0.06)",
+                                background: newmessage.trim()
+                                    ? `linear-gradient(135deg, ${accentColor}, ${accentColor}bb)`
+                                    : "rgba(255,255,255,0.06)",
                                 boxShadow: newmessage.trim() ? `0 4px 16px ${accentColor}40` : "none"
                             }}>
                             <svg width="16" height="16" fill="none" viewBox="0 0 24 24">
