@@ -4,8 +4,6 @@ import io from "socket.io-client";
 import { ChatState } from "../Context/ChatProvider";
 
 const ENDPOINT = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
-
-// ✅ socket bhi ref mein rakhenge — global var avoid karo
 let socketInstance = null;
 
 const SingleChat = () => {
@@ -15,15 +13,18 @@ const SingleChat = () => {
     const [istyping, setIsTyping] = useState(false);
     const messagesEndRef = useRef(null);
     const containerRef = useRef(null);
-
-    // ✅ KEY FIX: var ki jagah useRef — React re-renders ke saath sync rehta hai
     const selectedChatRef = useRef(null);
 
     const { user, selectedChat, setSelectedChat, notification, setNotification, config, hexToRGBA } = ChatState();
     const accentColor = config?.accent || "#10b981";
     const myId = user?.user?._id || user?._id;
 
-    // ✅ Jab bhi selectedChat change ho, ref update karo
+    // ✅ Auth header — token har API call mein
+    const getAuthHeader = () => {
+        const token = user?.token || localStorage.getItem("token");
+        return { headers: { Authorization: `Bearer ${token}` } };
+    };
+
     useEffect(() => {
         selectedChatRef.current = selectedChat;
     }, [selectedChat]);
@@ -45,7 +46,7 @@ const SingleChat = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     };
 
-    // ✅ SOCKET SETUP — ek baar
+    // ✅ SOCKET SETUP
     useEffect(() => {
         if (!user) return;
         socketInstance = io(ENDPOINT);
@@ -54,18 +55,14 @@ const SingleChat = () => {
         socketInstance.on("typing", () => setIsTyping(true));
         socketInstance.on("stop typing", () => setIsTyping(false));
 
-        // ✅ message received YAHAN rakho — socket setup ke saath
         socketInstance.on("message received", (newMsg) => {
             const currentChat = selectedChatRef.current;
-
             if (!currentChat || currentChat._id !== newMsg.chat._id) {
-                // Dusri chat ka message — notification mein
                 setNotification((prev) => {
                     if (prev.some((n) => n._id === newMsg._id)) return prev;
                     return [newMsg, ...prev];
                 });
             } else {
-                // ✅ Same chat — seedha add karo
                 setmessages((prev) => [...prev, newMsg]);
             }
         });
@@ -74,14 +71,17 @@ const SingleChat = () => {
             socketInstance.disconnect();
             socketInstance = null;
         };
-    }, [user]); // sirf user change hone par reconnect
+    }, [user]);
 
-    // ✅ FETCH MESSAGES + JOIN ROOM
+    // ✅ FETCH MESSAGES + JOIN ROOM — with auth
     useEffect(() => {
         if (!selectedChat?._id) return;
         const getmessages = async () => {
             try {
-                const { data } = await API.get(`/api/allmessages/${selectedChat._id}`);
+                const { data } = await API.get(
+                    `/api/allmessages/${selectedChat._id}`,
+                    getAuthHeader() // ✅ token
+                );
                 setmessages(data);
                 socketInstance?.emit("join chat", selectedChat._id);
             } catch (err) { console.log("Message fetch error", err); }
@@ -91,17 +91,18 @@ const SingleChat = () => {
 
     useEffect(() => { scrollToBottom(); }, [messages, istyping]);
 
-    // ✅ SEND MESSAGE
+    // ✅ SEND MESSAGE — with auth
     const sendMessage = async (event) => {
         if ((event.key === "Enter" || event.type === "click") && newmessage.trim()) {
             socketInstance?.emit("stop typing", selectedChat._id);
             try {
                 const content = newmessage;
                 setnewmessage("");
-                const { data } = await API.post("/api/sendmessage", {
-                    content,
-                    chatid: selectedChat._id
-                });
+                const { data } = await API.post(
+                    "/api/sendmessage",
+                    { content, chatid: selectedChat._id },
+                    getAuthHeader() // ✅ token
+                );
                 socketInstance?.emit("new message", data);
                 setmessages((prev) => [...prev, data]);
             } catch (err) { console.log("Send error", err); }
