@@ -1,71 +1,43 @@
 const sendEmail = async (email, otp) => {
   try {
-    const response = await fetch("https://api.sendgrid.com/v3/mail/send", {
+    const response = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${process.env.SENDGRID_API_KEY}`,
+        // .env file mein RESEND_API_KEY=re_your_key_here zaroor rakhna
+        "Authorization": `Bearer ${process.env.RESEND_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        personalizations: [
-          {
-            to: [{ email: email }],
-          },
-        ],
-        // From address wahi rakho jo SendGrid mein verified hai
-        from: { 
-          email: "princekudiya2004@gmail.com", 
-          name: "Ping-Chat Security" 
-        },
-        // Reply-To add karne se trust badhta hai
-        reply_to: { 
-          email: "princekudiya2004@gmail.com", 
-          name: "Support" 
-        },
-        subject: `🔐 ${otp} is your Ping-Chat verification code`,
-        content: [
-          {
-            type: "text/plain",
-            value: `Your Ping-Chat verification code is ${otp}. Valid for 10 minutes.`,
-          },
-          {
-            type: "text/html",
-            value: `
-              <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 12px; color: #1a1a1a;">
-                <div style="text-align: center; margin-bottom: 25px;">
-                  <h1 style="color: #10b981; margin: 0; font-size: 28px; letter-spacing: -1px;">Ping-Chat</h1>
-                  <p style="color: #666; font-size: 14px; margin-top: 5px;">Secure Verification System</p>
-                </div>
-                
-                <div style="background-color: #f9fafb; border-radius: 8px; padding: 30px; text-align: center; border: 1px dashed #d1d5db;">
-                  <p style="margin: 0 0 15px 0; font-size: 16px; color: #374151;">Use the code below to verify your account:</p>
-                  <span style="display: block; font-size: 36px; font-weight: 800; letter-spacing: 6px; color: #111827; margin: 10px 0;">${otp}</span>
-                  <p style="margin: 15px 0 0 0; font-size: 13px; color: #6b7280;">This code expires in 10 minutes.</p>
-                </div>
-
-                <div style="margin-top: 25px; font-size: 14px; color: #4b5563; line-height: 1.5;">
-                  <p>If you didn't request this code, you can safely ignore this email. Someone might have typed your email address by mistake.</p>
-                </div>
-
-                <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; text-align: center;">
-                  <p style="font-size: 12px; color: #9ca3af; margin: 0;">&copy; 2026 Ping-Chat App. Built with ❤️ in Delhi.</p>
-                </div>
-              </div>
-            `,
-          },
-        ],
+        // ⚠️ Free tier mein 'from' hamesha yahi rahega jab tak domain verify na ho
+        from: "Ping-Chat <onboarding@resend.dev>", 
+        to: email,
+        subject: `🔐 ${otp} is your Ping-Chat code`,
+        html: `
+          <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 450px; margin: auto; border: 1px solid #eee; border-radius: 15px; padding: 30px; text-align: center;">
+            <h1 style="color: #10b981; margin-bottom: 10px;">Ping-Chat</h1>
+            <p style="color: #666; font-size: 16px;">Verify your email to start chatting.</p>
+            
+            <div style="margin: 25px 0; padding: 20px; background: #f8fafc; border-radius: 12px; border: 1px dashed #cbd5e1;">
+              <span style="font-size: 32px; font-weight: 800; letter-spacing: 8px; color: #0f172a;">${otp}</span>
+            </div>
+            
+            <p style="font-size: 13px; color: #94a3b8;">This code is valid for 10 minutes. If you didn't request this, ignore this email.</p>
+            <hr style="border: 0; border-top: 1px solid #f1f5f9; margin: 25px 0;">
+            <p style="font-size: 11px; color: #cbd5e1;">&copy; 2026 Ping-Chat Secure Node</p>
+          </div>
+        `,
       }),
     });
 
-    if (response.status >= 400) {
-      const errorData = await response.json();
-      console.error("SendGrid Error Details:", errorData);
-    }
+    const data = await response.json();
 
-    console.log("OTP Sent! Status:", response.status);
+    if (response.ok) {
+      console.log("🔥 Success! OTP sent to Inbox via Resend. ID:", data.id);
+    } else {
+      console.error("❌ Resend Error Details:", data);
+    }
   } catch (error) {
-    console.error("Email Error:", error.message);
-    throw new Error("Failed to send OTP. Please try again later.");
+    console.error("🚨 Critical Email Error:", error.message);
   }
 };
 
