@@ -41,19 +41,35 @@ export const sendMessage=async(req,res)=>{
 
 // all messages
 
-export const allmessages=async(req,res)=>{
-    try{
-        const {chatid}=req.params;
-
-        const message=await Message.find({chat:chatid})
-        .populate("sender","name profilepic phonenumer")  //sender info
-        .populate("chat")
+export const allmessages = async (req, res) => {
+    try {
+        const { chatid } = req.params;
         
-        res.json(message);
+        // Frontend se 'page' mangwayenge, default 1 hoga
+        const page = parseInt(req.query.page) || 1; 
+        const limit = 20; // Ek baar mein sirf 20 messages mangwayenge
+        const skip = (page - 1) * limit;
+
+        const messages = await Message.find({ chat: chatid })
+            .populate("sender", "name profilepic email")
+            .populate("chat")
+            .sort({ createdAt: -1 }) // Sabse naye messages pehle (Taki skip sahi kaam kare)
+            .skip(skip)
+            .limit(limit);
+
+        // Check karne ke liye ki kya aur messages bache hain
+        const totalMessages = await Message.countDocuments({ chat: chatid });
+        const hasMore = skip + messages.length < totalMessages;
+
+        res.json({
+            messages: messages.reverse(), // Reverse taaki UI mein purane upar aur naye niche dikhein
+            hasMore,
+            totalMessages
+        });
     }
-    catch(err){
+    catch (err) {
         res.status(400).json({
-            message:err.message
-        })
+            message: err.message
+        });
     }
 }
