@@ -6,8 +6,20 @@ import { ChatState } from "../Context/ChatProvider";
 
 const Chatpage = () => {
   const [fetchagain, setFetchagain] = useState(false);
-  const { user, selectedChat } = ChatState();
+  const { user, selectedChat, config } = ChatState();
   const navigate = useNavigate();
+
+  const accentColor = config?.accent || "#10b981";
+
+  // RGBA Helper consistent with your other components
+  const rgba = (hex, alpha) => {
+    try {
+      const r = parseInt(hex.slice(1, 3), 16),
+            g = parseInt(hex.slice(3, 5), 16),
+            b = parseInt(hex.slice(5, 7), 16);
+      return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    } catch (e) { return `rgba(255, 255, 255, ${alpha})`; }
+  };
 
   useEffect(() => {
     const userinfo = JSON.parse(localStorage.getItem("userInfo"));
@@ -16,35 +28,51 @@ const Chatpage = () => {
 
   return (
     <div
-      style={{ height: "100vh" }}
-      className="w-full bg-[#05070a] flex items-center justify-center p-0 md:p-6 overflow-hidden font-sans relative"
+      className="w-full h-[100dvh] flex items-center justify-center p-0 md:p-6 overflow-hidden relative"
+      style={{ 
+        fontFamily: config?.font,
+        backgroundColor: "#050505" // Base dark theme
+      }}
     >
-      {/* Background Blobs */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-emerald-500/5 blur-[120px] rounded-full" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[600px] h-[600px] bg-blue-600/5 blur-[150px] rounded-full" />
-      </div>
+      {/* ✅ SYNCED BACKGROUND — MyChats jaisa layered design */}
+      <div className="absolute inset-0 z-0" style={{
+        background: `
+          radial-gradient(ellipse at 10% 10%, ${rgba(accentColor, 0.08)} 0%, transparent 50%),
+          radial-gradient(ellipse at 90% 90%, ${rgba(accentColor, 0.06)} 0%, transparent 50%),
+          linear-gradient(180deg, #070709 0%, #050505 100%)
+        `
+      }} />
 
-      <div className="relative w-full h-full max-w-[1600px] flex bg-white/[0.01] backdrop-blur-3xl border border-white/10 md:rounded-[40px] overflow-hidden shadow-[0_0_100px_rgba(0,0,0,0.5)]">
+      {/* Synced Grid Overlay */}
+      <div className="absolute inset-0 z-0 pointer-events-none" style={{
+        backgroundImage: `
+          linear-gradient(${rgba(accentColor, 0.03)} 1px, transparent 1px),
+          linear-gradient(90deg, ${rgba(accentColor, 0.03)} 1px, transparent 1px)
+        `,
+        backgroundSize: '40px 40px'
+      }} />
 
-        {/* Left — MyChats: mobile par hidden jab chat open ho */}
+      {/* Main Container */}
+      <div className="relative w-full h-full max-w-[1600px] flex bg-black/10 backdrop-blur-md border border-white/5 md:rounded-[40px] overflow-hidden shadow-[0_0_80px_rgba(0,0,0,0.6)]">
+
+        {/* Left — MyChats */}
         <div
           className={`
             ${selectedChat ? "hidden" : "flex"} md:flex
-            w-full md:w-[350px] lg:w-[400px] h-full
-            border-r border-white/5 flex-col bg-black/20 shrink-0
+            w-full md:w-[350px] lg:w-[420px] h-full
+            border-r border-white/5 flex-col bg-black/5 shrink-0
           `}
         >
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-hidden">
             <MyChats fetchAgain={fetchagain} setFetchAgain={setFetchagain} />
           </div>
         </div>
 
-        {/* Right — ChatBox: mobile par full width jab chat open ho */}
+        {/* Right — ChatBox */}
         <div
           className={`
             ${!selectedChat ? "hidden" : "flex"} md:flex
-            flex-1 h-full overflow-hidden
+            flex-1 h-full overflow-hidden relative
           `}
         >
           {user && (
