@@ -1,43 +1,34 @@
-import React, { useState, useCallback } from "react";
+import React, { useState } from "react";
 import { ChatState } from "../Context/ChatProvider";
 import API from "../services/api";
 import ProfileModal from "../pages/Profile";
 import SingleChat from "../components/Singlechat";
 
 const ChatBox = ({ fetchagain, setFetchagain }) => {
-  const { selectedChat, setSelectedChat, user, config, hexToRGBA } = ChatState();
+  const { selectedChat, setSelectedChat, user, config } = ChatState();
   const [showMenu, setShowMenu] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [profileUser, setProfileUser] = useState(null);
 
-  // 🎨 Mood background — SingleChat se aata hai
-  const [moodColor, setMoodColor] = useState(config?.accent || "#6366f1");
+  const accentColor = config?.accent || "#10b981";
 
-  const rgba = hexToRGBA
-    ? hexToRGBA
-    : (hex, alpha) => {
-        try {
-          const r = parseInt(hex.slice(1, 3), 16);
-          const g = parseInt(hex.slice(3, 5), 16);
-          const b = parseInt(hex.slice(5, 7), 16);
-          return `rgba(${r},${g},${b},${alpha})`;
-        } catch { return `rgba(99,102,241,${alpha})`; }
-      };
+  const rgba = (hex, alpha) => {
+    try {
+      const r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
+      return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    } catch (e) { return `rgba(255, 255, 255, ${alpha})`; }
+  };
 
   const getAuthHeader = () => {
     const token = user?.token || localStorage.getItem("token");
     return { headers: { Authorization: `Bearer ${token}` } };
   };
 
-  // SingleChat se mood color receive karo
-  const handleMoodChange = useCallback((color) => {
-    setMoodColor(color);
-  }, []);
-
   if (!selectedChat) return null;
 
-  const myId = user?.user?._id || user?._id;
-  const receiver = selectedChat.users?.find((u) => u._id !== myId) || {};
+  const userData = user?.user || user;
+  const myId = (userData?._id || userData?.id)?.toString();
+  const receiver = selectedChat.users?.find((u) => (u._id || u.id)?.toString() !== myId) || {};
 
   const handleViewProfile = () => {
     setProfileUser(receiver);
@@ -51,6 +42,7 @@ const ChatBox = ({ fetchagain, setFetchagain }) => {
       await API.post("/api/blockuser", { userblockid: receiver._id }, getAuthHeader());
       alert("User blocked successfully");
       setSelectedChat(null);
+      setFetchagain(!fetchagain);
     } catch (err) {
       alert("Failed to block user");
     }
@@ -59,131 +51,113 @@ const ChatBox = ({ fetchagain, setFetchagain }) => {
 
   return (
     <>
-      <style>{`
-        .cb-mood-bg {
-          transition: background 0.5s ease;
-        }
-        .cb-grid {
-          position: absolute; inset: 0;
-          background-image:
-            linear-gradient(${rgba(moodColor, 0.06)} 1px, transparent 1px),
-            linear-gradient(90deg, ${rgba(moodColor, 0.06)} 1px, transparent 1px);
-          background-size: 45px 45px;
-          opacity: .5; pointer-events: none; z-index: 0;
-          transition: background-image 0.5s ease;
-        }
-        /* Mood glow — top corner */
-        .cb-mood-glow {
-          position: absolute;
-          top: -80px; right: -80px;
-          width: 300px; height: 300px;
-          border-radius: 50%;
-          pointer-events: none;
-          z-index: 0;
-          transition: background 0.5s ease;
-        }
-      `}</style>
+      <div 
+        className={`relative h-full flex flex-col w-full transition-all duration-500 ${
+          selectedChat ? 'flex' : 'hidden md:flex'
+        }`}
+        style={{ fontFamily: config.font, background: "#050505" }}
+      >
+        {/* Background Layers - Synced with Mychats */}
+        <div className="absolute inset-0 z-0" style={{
+          background: `
+            radial-gradient(ellipse at 80% 20%, ${rgba(accentColor, 0.06)} 0%, transparent 50%),
+            radial-gradient(ellipse at 20% 80%, ${rgba(accentColor, 0.04)} 0%, transparent 50%),
+            linear-gradient(180deg, #070709 0%, #050505 100%)
+          `
+        }} />
 
-      {isProfileOpen && (
-        <div className="fixed inset-0 z-[2000] flex items-center justify-center">
+        <div className="absolute inset-0 z-0 pointer-events-none" style={{
+          backgroundImage: `
+            linear-gradient(${rgba(accentColor, 0.03)} 1px, transparent 1px),
+            linear-gradient(90deg, ${rgba(accentColor, 0.03)} 1px, transparent 1px)
+          `,
+          backgroundSize: '40px 40px'
+        }} />
+
+        {isProfileOpen && (
           <ProfileModal
             isOpen={isProfileOpen}
             onClose={() => setIsProfileOpen(false)}
             user={profileUser}
           />
-        </div>
-      )}
+        )}
 
-      <div
-        className="cb-mood-bg relative w-full h-full flex flex-col overflow-hidden"
-        style={{
-          fontFamily: config?.font,
-          background: `radial-gradient(ellipse at top right, ${rgba(moodColor, 0.08)} 0%, #050505 60%)`,
-        }}
-      >
-        <div className="cb-grid" />
-
-        {/* Mood glow blob */}
-        <div
-          className="cb-mood-glow"
-          style={{ background: `radial-gradient(circle, ${rgba(moodColor, 0.15)} 0%, transparent 70%)` }}
-        />
-
-        {/* HEADER */}
-        <header
-          className="flex-shrink-0 h-[70px] flex items-center justify-between px-5 z-10 relative"
-          style={{
-            background: "rgba(5,5,5,0.9)",
-            borderBottom: `1px solid ${rgba(moodColor, 0.15)}`,
-            transition: "border-color 0.5s ease",
+        {/* ✅ FIXED HEADER - Increased z-index and removed overflow issues */}
+        <header 
+          className="flex-shrink-0 h-[70px] md:h-[85px] flex items-center justify-between px-6 z-[100] relative"
+          style={{ 
+            borderBottom: "1px solid rgba(255,255,255,0.05)", 
+            background: "rgba(10,10,12,0.4)", 
+            backdropFilter: "blur(10px)" 
           }}
         >
           <div className="flex items-center gap-4">
             <button
               onClick={() => setSelectedChat(null)}
-              className="md:hidden p-2 rounded-xl text-white"
-              style={{ background: "rgba(255,255,255,0.05)" }}
+              className="md:hidden p-2 rounded-xl text-white transition-all active:scale-90"
+              style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.05)" }}
             >
-              <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                <path d="M15 19l-7-7 7-7" />
+              <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                <path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </button>
 
-            <div onClick={handleViewProfile} className="flex items-center gap-3 cursor-pointer">
+            <div onClick={handleViewProfile} className="flex items-center gap-3 cursor-pointer group">
               <div
-                className="w-10 h-10 rounded-2xl border-2 flex items-center justify-center font-black text-lg"
-                style={{
-                  borderColor: rgba(moodColor, 0.4),
-                  color: moodColor,
-                  background: rgba(moodColor, 0.08),
-                  transition: "border-color 0.5s ease, color 0.5s ease, background 0.5s ease",
+                className="w-10 h-10 md:w-11 md:h-11 rounded-2xl border flex items-center justify-center font-black text-lg transition-transform group-hover:rotate-6 overflow-hidden"
+                style={{ 
+                  borderColor: rgba(accentColor, 0.3), 
+                  color: accentColor, 
+                  background: rgba(accentColor, 0.05),
+                  boxShadow: `0 0 20px ${rgba(accentColor, 0.1)}`
                 }}
               >
-                {receiver.name?.charAt(0)?.toUpperCase() || "?"}
+                {receiver.profilepic ? (
+                  <img src={receiver.profilepic} className="w-full h-full object-cover" alt="p" />
+                ) : (
+                  receiver.name?.charAt(0)?.toUpperCase() || "?"
+                )}
               </div>
-              <div>
-                <h2 className="text-[15px] font-black text-white uppercase italic leading-none">
+              <div className="flex flex-col">
+                <h2 className="text-[15px] font-black text-white uppercase italic leading-none tracking-tight">
                   {receiver.name || "User"}
                 </h2>
-                {/* Mood indicator dot */}
-                <div className="flex items-center gap-1 mt-0.5">
-                  <div
-                    className="w-1.5 h-1.5 rounded-full"
-                    style={{ background: moodColor, transition: "background 0.5s ease" }}
-                  />
-                  <span className="text-[9px] uppercase tracking-widest" style={{ color: rgba(moodColor, 0.7) }}>
-                    vibe active
-                  </span>
-                </div>
+                <span className="text-[8px] uppercase tracking-[0.2em] font-bold opacity-40 mt-1" style={{ color: accentColor }}>
+                  Connection Active
+                </span>
               </div>
             </div>
           </div>
 
+          {/* ✅ FIXED MENU - Using z-[110] and top-[80%] to stay visible */}
           <div className="relative">
-            <button onClick={() => setShowMenu(!showMenu)} className="p-2 text-zinc-400 text-xl">
+            <button
+              onClick={() => setShowMenu(!showMenu)}
+              className="p-2 text-zinc-500 hover:text-white transition-colors text-xl font-bold"
+            >
               ⋮
             </button>
             {showMenu && (
               <>
-                <div className="fixed inset-0 z-[190]" onClick={() => setShowMenu(false)} />
+                <div className="fixed inset-0 z-[105]" onClick={() => setShowMenu(false)} />
                 <div
-                  className="absolute right-0 top-[110%] w-48 rounded-2xl overflow-hidden z-[200]"
+                  className="absolute right-0 top-[80%] w-48 rounded-2xl overflow-hidden z-[110] animate-in fade-in slide-in-from-top-2 duration-200"
                   style={{
-                    background: "#0f0f0f",
-                    border: `1px solid ${rgba(moodColor, 0.25)}`,
-                    boxShadow: `0 8px 32px rgba(0,0,0,0.5), 0 0 20px ${rgba(moodColor, 0.1)}`,
+                    background: "#0f0f11",
+                    border: `1px solid ${rgba(accentColor, 0.2)}`,
+                    boxShadow: "0 10px 40px rgba(0,0,0,0.8)",
                   }}
                 >
                   <button
                     onClick={handleViewProfile}
-                    className="w-full flex items-center gap-3 px-4 py-3.5 text-[13px] text-white/80 text-left"
-                    style={{ borderBottom: `1px solid ${rgba(moodColor, 0.1)}` }}
+                    className="w-full px-4 py-4 text-[11px] text-white/70 hover:bg-white/5 text-left uppercase font-bold tracking-widest transition-colors"
+                    style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}
                   >
                     View Identity
                   </button>
                   <button
                     onClick={handleBlockUser}
-                    className="w-full flex items-center gap-3 px-4 py-3.5 text-[13px] text-red-500 font-bold text-left"
+                    className="w-full px-4 py-4 text-[11px] text-red-500 hover:bg-red-500/10 text-left uppercase font-black tracking-widest transition-colors"
                   >
                     Block User
                   </button>
@@ -193,13 +167,9 @@ const ChatBox = ({ fetchagain, setFetchagain }) => {
           </div>
         </header>
 
-        {/* SINGLE CHAT */}
-        <div className="flex-1 flex flex-col overflow-hidden min-h-0 relative z-10">
-          <SingleChat
-            fetchagain={fetchagain}
-            setFetchagain={setFetchagain}
-            onMoodChange={handleMoodChange}
-          />
+        {/* Chat Area */}
+        <div className="flex-1 flex flex-col overflow-hidden relative z-10">
+          <SingleChat fetchagain={fetchagain} setFetchagain={setFetchagain} />
         </div>
       </div>
     </>
