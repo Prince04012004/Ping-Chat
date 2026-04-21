@@ -1,15 +1,21 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState } from "react";
 import { ChatState } from "../Context/ChatProvider";
 import API from "../services/api";
 import ProfileModal from "../pages/Profile";
-import SingleChat from "./SingleChat";
+import SingleChat from "./Singlechat";
 
-const ChatBox = () => {
+const ChatBox = ({ fetchagain, setFetchagain }) => {
   const { selectedChat, setSelectedChat, user, config, hexToRGBA } = ChatState();
   const [showMenu, setShowMenu] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [profileUser, setProfileUser] = useState(null);
+
   const accentColor = config?.accent || "#10b981";
+
+  const rgba = hexToRGBA
+    ? hexToRGBA
+    : (hex, alpha) =>
+        `${hex}${Math.round(alpha * 255).toString(16).padStart(2, "0")}`;
 
   const getAuthHeader = () => {
     const token = user?.token || localStorage.getItem("token");
@@ -18,10 +24,8 @@ const ChatBox = () => {
 
   if (!selectedChat) return null;
 
-  const receiver =
-    selectedChat.users?.find(
-      (u) => u._id !== (user?.user?._id || user?._id)
-    ) || {};
+  const myId = user?.user?._id || user?._id;
+  const receiver = selectedChat.users?.find((u) => u._id !== myId) || {};
 
   const handleViewProfile = () => {
     setProfileUser(receiver);
@@ -30,10 +34,14 @@ const ChatBox = () => {
   };
 
   const handleBlockUser = async () => {
-    if (!window.confirm(`Are you sure you want to block ${receiver.name}?`)) return;
+    if (!window.confirm(`Block ${receiver.name}?`)) return;
     try {
-      await API.post("/api/blockuser", { userblockid: receiver._id }, getAuthHeader());
-      alert("User Blocked Successfully");
+      await API.post(
+        "/api/blockuser",
+        { userblockid: receiver._id },
+        getAuthHeader()
+      );
+      alert("User blocked successfully");
       setSelectedChat(null);
     } catch (err) {
       console.error("Block failed", err);
@@ -48,15 +56,10 @@ const ChatBox = () => {
         .cb-grid {
           position: absolute; inset: 0;
           background-image:
-            linear-gradient(${hexToRGBA(accentColor, 0.05)} 1px, transparent 1px),
-            linear-gradient(90deg, ${hexToRGBA(accentColor, 0.05)} 1px, transparent 1px);
+            linear-gradient(${rgba(accentColor, 0.05)} 1px, transparent 1px),
+            linear-gradient(90deg, ${rgba(accentColor, 0.05)} 1px, transparent 1px);
           background-size: 45px 45px;
-          opacity: .4; z-index: 0; pointer-events: none;
-        }
-        .custom-scrollbar::-webkit-scrollbar { width: 3px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: ${hexToRGBA(accentColor, 0.3)};
-          border-radius: 10px;
+          opacity: .4; pointer-events: none; z-index: 0;
         }
       `}</style>
 
@@ -71,51 +74,53 @@ const ChatBox = () => {
       )}
 
       {/*
-        Yeh div poora available space leta hai.
-        Parent (jo ChatBox ko render karta hai) ko
-        h-full ya fixed height dena zaroori hai.
+        w-full h-full flex flex-col — Chatpage ke flex container mein fit hota hai
+        overflow-hidden — scroll sirf messages div par hoga
+        koi position: fixed nahi
       */}
       <div
-        className="flex flex-col w-full h-full bg-[#050505] overflow-hidden relative"
+        className="relative w-full h-full flex flex-col bg-[#050505] overflow-hidden"
         style={{ fontFamily: config?.font }}
       >
         <div className="cb-grid" />
 
-        {/* HEADER */}
-        <header className="flex-shrink-0 w-full h-[70px] flex items-center justify-between px-5 bg-black/80 backdrop-blur-3xl border-b border-white/5 z-[50] relative">
+        {/* ── HEADER ── */}
+        <header className="flex-shrink-0 h-[70px] flex items-center justify-between px-5 bg-black/80 backdrop-blur-3xl border-b border-white/5 z-10 relative">
           <div className="flex items-center gap-4">
+            {/* Back button — mobile only */}
             <button
               onClick={() => setSelectedChat(null)}
-              className="p-1 md:hidden"
-              style={{ color: accentColor }}
+              className="md:hidden p-2 rounded-xl bg-white/5 text-white"
             >
-              ←
+              <svg
+                width="18" height="18" fill="none"
+                viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"
+              >
+                <path d="M15 19l-7-7 7-7" />
+              </svg>
             </button>
+
             <div
               onClick={handleViewProfile}
               className="flex items-center gap-3 cursor-pointer"
             >
               <div
-                className="w-11 h-11 rounded-2xl border-2 overflow-hidden bg-black"
-                style={{ borderColor: hexToRGBA(accentColor, 0.2) }}
+                className="w-10 h-10 rounded-2xl border-2 flex items-center justify-center font-black text-lg bg-black"
+                style={{ borderColor: rgba(accentColor, 0.25), color: accentColor }}
               >
-                <div
-                  className="w-full h-full flex items-center justify-center font-black"
-                  style={{ color: accentColor }}
-                >
-                  {receiver.name?.charAt(0) || "A"}
-                </div>
+                {receiver.name?.charAt(0)?.toUpperCase() || "?"}
               </div>
               <h2 className="text-[15px] font-black text-white uppercase italic leading-none">
-                {receiver.name || "Aura User"}
+                {receiver.name || "User"}
               </h2>
             </div>
           </div>
 
+          {/* 3-dot menu */}
           <div className="relative">
             <button
               onClick={() => setShowMenu(!showMenu)}
-              className="p-2 text-zinc-400 hover:text-white transition-colors"
+              className="p-2 text-zinc-400 hover:text-white transition-colors text-xl"
             >
               ⋮
             </button>
@@ -129,7 +134,7 @@ const ChatBox = () => {
                   className="absolute right-0 top-[110%] w-48 rounded-2xl overflow-hidden z-[200]"
                   style={{
                     background: "rgba(10,10,10,0.95)",
-                    border: `1px solid ${hexToRGBA(accentColor, 0.2)}`,
+                    border: `1px solid ${rgba(accentColor, 0.2)}`,
                     backdropFilter: "blur(20px)",
                     boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
                   }}
@@ -137,7 +142,7 @@ const ChatBox = () => {
                   <button
                     onClick={handleViewProfile}
                     className="w-full flex items-center gap-3 px-4 py-3.5 text-[13px] text-white/80 hover:text-white transition-colors text-left"
-                    style={{ borderBottom: `1px solid ${hexToRGBA(accentColor, 0.1)}` }}
+                    style={{ borderBottom: `1px solid ${rgba(accentColor, 0.1)}` }}
                   >
                     View Identity
                   </button>
@@ -145,7 +150,7 @@ const ChatBox = () => {
                     onClick={handleBlockUser}
                     className="w-full flex items-center gap-3 px-4 py-3.5 text-[13px] text-red-500 font-bold hover:bg-red-500/10 transition-colors text-left"
                   >
-                    Terminate Connection (Block)
+                    Block User
                   </button>
                 </div>
               </>
@@ -153,9 +158,10 @@ const ChatBox = () => {
           </div>
         </header>
 
-        {/* SINGLE CHAT — messages + footer yahan render hote hain */}
+        {/* ── SINGLE CHAT (messages + input) ── */}
+        {/* flex-1 + min-h-0 — yeh critical hai, bina iske messages overflow ho jaate hain */}
         <div className="flex-1 flex flex-col overflow-hidden min-h-0 relative z-10">
-          <SingleChat accentColor={accentColor} hexToRGBA={hexToRGBA} />
+          <SingleChat fetchagain={fetchagain} setFetchagain={setFetchagain} />
         </div>
       </div>
     </>

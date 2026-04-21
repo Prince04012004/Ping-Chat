@@ -6,13 +6,13 @@ import { ChatState } from "../Context/ChatProvider";
 const ENDPOINT = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
 let socketInstance = null;
 
-// accentColor aur hexToRGBA ChatBox se props mein aate hain
-const SingleChat = ({ accentColor = "#10b981", hexToRGBA }) => {
+// SingleChat = sirf messages list + input box
+// Header ChatBox mein hai
+const SingleChat = ({ fetchagain, setFetchagain }) => {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
   const [typing, setTyping] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
-
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -21,15 +21,21 @@ const SingleChat = ({ accentColor = "#10b981", hexToRGBA }) => {
   const containerRef = useRef(null);
   const selectedChatRef = useRef(null);
 
-  const { user, selectedChat, setNotification } = ChatState();
+  const { user, selectedChat, setNotification, config, hexToRGBA } = ChatState();
+  const accentColor = config?.accent || "#10b981";
   const myId = user?.user?._id || user?._id;
+
+  const rgba = hexToRGBA
+    ? hexToRGBA
+    : (hex, alpha) =>
+        `${hex}${Math.round(alpha * 255).toString(16).padStart(2, "0")}`;
 
   const getAuthHeader = () => {
     const token = user?.token || localStorage.getItem("token");
     return { headers: { Authorization: `Bearer ${token}` } };
   };
 
-  // Ref sync — socket callback mein stale closure se bachne ke liye
+  // Stale closure fix for socket callbacks
   useEffect(() => {
     selectedChatRef.current = selectedChat;
   }, [selectedChat]);
@@ -38,15 +44,13 @@ const SingleChat = ({ accentColor = "#10b981", hexToRGBA }) => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  // Socket setup
+  // Socket — ek baar setup, user change hone par reset
   useEffect(() => {
     if (!user) return;
     socketInstance = io(ENDPOINT);
     socketInstance.emit("setup", user);
-
     socketInstance.on("typing", () => setIsTyping(true));
     socketInstance.on("stop typing", () => setIsTyping(false));
-
     socketInstance.on("message received", (newMsg) => {
       const currentChat = selectedChatRef.current;
       if (!currentChat || currentChat._id !== newMsg.chat._id) {
@@ -56,7 +60,6 @@ const SingleChat = ({ accentColor = "#10b981", hexToRGBA }) => {
         setTimeout(scrollToBottom, 100);
       }
     });
-
     return () => {
       socketInstance.disconnect();
       socketInstance = null;
@@ -70,16 +73,14 @@ const SingleChat = ({ accentColor = "#10b981", hexToRGBA }) => {
         `/api/allmessages/${selectedChat._id}?page=${pageNum}`,
         getAuthHeader()
       );
-
+      // Support both {messages, hasMore} and plain array
       const newMsgs = Array.isArray(data.messages)
         ? data.messages
         : Array.isArray(data)
-        ? data        // purana API jo seedha array bhejta tha uske liye fallback
+        ? data
         : [];
-
       setMessages((prev) => (pageNum === 1 ? newMsgs : [...newMsgs, ...prev]));
       setHasMore(data.hasMore || false);
-
       if (pageNum === 1) {
         socketInstance?.emit("join chat", selectedChat._id);
         setTimeout(scrollToBottom, 200);
@@ -91,7 +92,7 @@ const SingleChat = ({ accentColor = "#10b981", hexToRGBA }) => {
     }
   };
 
-  // Chat change hone par reset + fresh fetch
+  // Chat switch hone par fresh fetch
   useEffect(() => {
     if (!selectedChat?._id) return;
     setMessages([]);
@@ -100,7 +101,6 @@ const SingleChat = ({ accentColor = "#10b981", hexToRGBA }) => {
     fetchMessages(1);
   }, [selectedChat?._id]);
 
-  // Scroll upar jaane par older messages load karo
   const handleScroll = async (e) => {
     const { scrollTop, scrollHeight } = e.currentTarget;
     if (scrollTop < 10 && hasMore && !loadingMore) {
@@ -153,7 +153,6 @@ const SingleChat = ({ accentColor = "#10b981", hexToRGBA }) => {
     }, 3000);
   };
 
-  // Messages grouped by date
   const groupedMessages = messages.reduce((groups, msg) => {
     if (!msg?.createdAt) return groups;
     const date = new Date(msg.createdAt).toLocaleDateString("en-IN", {
@@ -164,13 +163,6 @@ const SingleChat = ({ accentColor = "#10b981", hexToRGBA }) => {
     groups[date].push(msg);
     return groups;
   }, {});
-
-  const borderColor = hexToRGBA
-    ? hexToRGBA(accentColor, 0.3)
-    : `${accentColor}4d`;
-  const bgMine = hexToRGBA
-    ? hexToRGBA(accentColor, 0.18)
-    : `${accentColor}2e`;
 
   return (
     <>
@@ -183,15 +175,16 @@ const SingleChat = ({ accentColor = "#10b981", hexToRGBA }) => {
           width: 4px; height: 4px; border-radius: 50%;
           animation: typingPulse 1.2s ease infinite;
         }
-        .sc-messages::-webkit-scrollbar { width: 3px; }
-        .sc-messages::-webkit-scrollbar-thumb {
-          background: ${accentColor}4d; border-radius: 10px;
+        .sc-scroll::-webkit-scrollbar { width: 3px; }
+        .sc-scroll::-webkit-scrollbar-thumb {
+          background: ${rgba(accentColor, 0.3)};
+          border-radius: 10px;
         }
       `}</style>
 
-      {/* Messages area */}
+      {/* ── MESSAGES ── */}
       <div
-        className="sc-messages flex-1 overflow-y-auto px-5 py-6"
+        className="sc-scroll flex-1 overflow-y-auto px-5 py-6"
         style={{ minHeight: 0 }}
         ref={containerRef}
         onScroll={handleScroll}
@@ -204,7 +197,6 @@ const SingleChat = ({ accentColor = "#10b981", hexToRGBA }) => {
 
         {Object.entries(groupedMessages).map(([date, msgs]) => (
           <div key={date}>
-            {/* Date separator */}
             <div className="flex items-center gap-4 my-6">
               <div className="flex-1 h-px bg-white/5" />
               <span className="text-[9px] font-bold text-white/20 uppercase tracking-[2px]">
@@ -228,10 +220,12 @@ const SingleChat = ({ accentColor = "#10b981", hexToRGBA }) => {
                           ? "24px 24px 4px 24px"
                           : "24px 24px 24px 4px",
                         backgroundColor: isMine
-                          ? bgMine
+                          ? rgba(accentColor, 0.18)
                           : "rgba(255,255,255,0.04)",
                         border: `1px solid ${
-                          isMine ? borderColor : "rgba(255,255,255,0.08)"
+                          isMine
+                            ? rgba(accentColor, 0.3)
+                            : "rgba(255,255,255,0.08)"
                         }`,
                         backdropFilter: "blur(15px)",
                       }}
@@ -256,7 +250,7 @@ const SingleChat = ({ accentColor = "#10b981", hexToRGBA }) => {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Footer / Input */}
+      {/* ── FOOTER / INPUT ── */}
       <footer className="flex-shrink-0 p-5 bg-black/40 backdrop-blur-3xl border-t border-white/5">
         <div className="flex items-center gap-3 bg-white/[0.04] border border-white/10 pl-6 pr-2 py-2 rounded-[28px]">
           <input
