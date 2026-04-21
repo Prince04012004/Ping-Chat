@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { ChatState } from "../Context/ChatProvider";
 import API from "../services/api";
 import ProfileModal from "../pages/Profile";
-import SingleChat from "./Singlechat";
+import SingleChat from "../components/Singlechat";
 
 const ChatBox = ({ fetchagain, setFetchagain }) => {
   const { selectedChat, setSelectedChat, user, config, hexToRGBA } = ChatState();
