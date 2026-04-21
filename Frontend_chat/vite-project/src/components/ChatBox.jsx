@@ -14,8 +14,14 @@ const ChatBox = ({ fetchagain, setFetchagain }) => {
 
   const rgba = hexToRGBA
     ? hexToRGBA
-    : (hex, alpha) =>
-        `${hex}${Math.round(alpha * 255).toString(16).padStart(2, "0")}`;
+    : (hex, alpha) => {
+        try {
+          const r = parseInt(hex.slice(1, 3), 16);
+          const g = parseInt(hex.slice(3, 5), 16);
+          const b = parseInt(hex.slice(5, 7), 16);
+          return `rgba(${r},${g},${b},${alpha})`;
+        } catch { return `rgba(16,185,129,${alpha})`; }
+      };
 
   const getAuthHeader = () => {
     const token = user?.token || localStorage.getItem("token");
@@ -36,15 +42,10 @@ const ChatBox = ({ fetchagain, setFetchagain }) => {
   const handleBlockUser = async () => {
     if (!window.confirm(`Block ${receiver.name}?`)) return;
     try {
-      await API.post(
-        "/api/blockuser",
-        { userblockid: receiver._id },
-        getAuthHeader()
-      );
+      await API.post("/api/blockuser", { userblockid: receiver._id }, getAuthHeader());
       alert("User blocked successfully");
       setSelectedChat(null);
     } catch (err) {
-      console.error("Block failed", err);
       alert("Failed to block user");
     }
     setShowMenu(false);
@@ -73,40 +74,32 @@ const ChatBox = ({ fetchagain, setFetchagain }) => {
         </div>
       )}
 
-      {/*
-        w-full h-full flex flex-col — Chatpage ke flex container mein fit hota hai
-        overflow-hidden — scroll sirf messages div par hoga
-        koi position: fixed nahi
-      */}
       <div
-        className="relative w-full h-full flex flex-col bg-[#050505] overflow-hidden"
-        style={{ fontFamily: config?.font }}
+        className="relative w-full h-full flex flex-col overflow-hidden"
+        style={{ fontFamily: config?.font, background: "#050505" }}
       >
         <div className="cb-grid" />
 
-        {/* ── HEADER ── */}
-        <header className="flex-shrink-0 h-[70px] flex items-center justify-between px-5 bg-black/80 backdrop-blur-3xl border-b border-white/5 z-10 relative">
+        {/* HEADER — backdrop-blur hataya */}
+        <header
+          className="flex-shrink-0 h-[70px] flex items-center justify-between px-5 z-10 relative"
+          style={{ background: "#0a0a0a", borderBottom: "1px solid rgba(255,255,255,0.05)" }}
+        >
           <div className="flex items-center gap-4">
-            {/* Back button — mobile only */}
             <button
               onClick={() => setSelectedChat(null)}
-              className="md:hidden p-2 rounded-xl bg-white/5 text-white"
+              className="md:hidden p-2 rounded-xl text-white"
+              style={{ background: "rgba(255,255,255,0.05)" }}
             >
-              <svg
-                width="18" height="18" fill="none"
-                viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"
-              >
+              <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                 <path d="M15 19l-7-7 7-7" />
               </svg>
             </button>
 
-            <div
-              onClick={handleViewProfile}
-              className="flex items-center gap-3 cursor-pointer"
-            >
+            <div onClick={handleViewProfile} className="flex items-center gap-3 cursor-pointer">
               <div
-                className="w-10 h-10 rounded-2xl border-2 flex items-center justify-center font-black text-lg bg-black"
-                style={{ borderColor: rgba(accentColor, 0.25), color: accentColor }}
+                className="w-10 h-10 rounded-2xl border-2 flex items-center justify-center font-black text-lg"
+                style={{ borderColor: rgba(accentColor, 0.25), color: accentColor, background: "#000" }}
               >
                 {receiver.name?.charAt(0)?.toUpperCase() || "?"}
               </div>
@@ -116,39 +109,34 @@ const ChatBox = ({ fetchagain, setFetchagain }) => {
             </div>
           </div>
 
-          {/* 3-dot menu */}
           <div className="relative">
             <button
               onClick={() => setShowMenu(!showMenu)}
-              className="p-2 text-zinc-400 hover:text-white transition-colors text-xl"
+              className="p-2 text-zinc-400 text-xl"
             >
               ⋮
             </button>
             {showMenu && (
               <>
-                <div
-                  className="fixed inset-0 z-[190]"
-                  onClick={() => setShowMenu(false)}
-                />
+                <div className="fixed inset-0 z-[190]" onClick={() => setShowMenu(false)} />
                 <div
                   className="absolute right-0 top-[110%] w-48 rounded-2xl overflow-hidden z-[200]"
                   style={{
-                    background: "rgba(10,10,10,0.95)",
+                    background: "#0f0f0f",
                     border: `1px solid ${rgba(accentColor, 0.2)}`,
-                    backdropFilter: "blur(20px)",
                     boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
                   }}
                 >
                   <button
                     onClick={handleViewProfile}
-                    className="w-full flex items-center gap-3 px-4 py-3.5 text-[13px] text-white/80 hover:text-white transition-colors text-left"
+                    className="w-full flex items-center gap-3 px-4 py-3.5 text-[13px] text-white/80 text-left"
                     style={{ borderBottom: `1px solid ${rgba(accentColor, 0.1)}` }}
                   >
                     View Identity
                   </button>
                   <button
                     onClick={handleBlockUser}
-                    className="w-full flex items-center gap-3 px-4 py-3.5 text-[13px] text-red-500 font-bold hover:bg-red-500/10 transition-colors text-left"
+                    className="w-full flex items-center gap-3 px-4 py-3.5 text-[13px] text-red-500 font-bold text-left"
                   >
                     Block User
                   </button>
@@ -158,8 +146,7 @@ const ChatBox = ({ fetchagain, setFetchagain }) => {
           </div>
         </header>
 
-        {/* ── SINGLE CHAT (messages + input) ── */}
-        {/* flex-1 + min-h-0 — yeh critical hai, bina iske messages overflow ho jaate hain */}
+        {/* SINGLE CHAT */}
         <div className="flex-1 flex flex-col overflow-hidden min-h-0 relative z-10">
           <SingleChat fetchagain={fetchagain} setFetchagain={setFetchagain} />
         </div>

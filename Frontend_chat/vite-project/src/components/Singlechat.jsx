@@ -6,8 +6,6 @@ import { ChatState } from "../Context/ChatProvider";
 const ENDPOINT = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
 let socketInstance = null;
 
-// SingleChat = sirf messages list + input box
-// Header ChatBox mein hai
 const SingleChat = ({ fetchagain, setFetchagain }) => {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
@@ -27,15 +25,20 @@ const SingleChat = ({ fetchagain, setFetchagain }) => {
 
   const rgba = hexToRGBA
     ? hexToRGBA
-    : (hex, alpha) =>
-        `${hex}${Math.round(alpha * 255).toString(16).padStart(2, "0")}`;
+    : (hex, alpha) => {
+        try {
+          const r = parseInt(hex.slice(1, 3), 16);
+          const g = parseInt(hex.slice(3, 5), 16);
+          const b = parseInt(hex.slice(5, 7), 16);
+          return `rgba(${r},${g},${b},${alpha})`;
+        } catch { return `rgba(16,185,129,${alpha})`; }
+      };
 
   const getAuthHeader = () => {
     const token = user?.token || localStorage.getItem("token");
     return { headers: { Authorization: `Bearer ${token}` } };
   };
 
-  // Stale closure fix for socket callbacks
   useEffect(() => {
     selectedChatRef.current = selectedChat;
   }, [selectedChat]);
@@ -44,7 +47,6 @@ const SingleChat = ({ fetchagain, setFetchagain }) => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  // Socket — ek baar setup, user change hone par reset
   useEffect(() => {
     if (!user) return;
     socketInstance = io(ENDPOINT);
@@ -73,7 +75,6 @@ const SingleChat = ({ fetchagain, setFetchagain }) => {
         `/api/allmessages/${selectedChat._id}?page=${pageNum}`,
         getAuthHeader()
       );
-      // Support both {messages, hasMore} and plain array
       const newMsgs = Array.isArray(data.messages)
         ? data.messages
         : Array.isArray(data)
@@ -92,7 +93,6 @@ const SingleChat = ({ fetchagain, setFetchagain }) => {
     }
   };
 
-  // Chat switch hone par fresh fetch
   useEffect(() => {
     if (!selectedChat?._id) return;
     setMessages([]);
@@ -182,15 +182,15 @@ const SingleChat = ({ fetchagain, setFetchagain }) => {
         }
       `}</style>
 
-      {/* ── MESSAGES ── */}
+      {/* MESSAGES — no backdropFilter */}
       <div
         className="sc-scroll flex-1 overflow-y-auto px-5 py-6"
-        style={{ minHeight: 0 }}
+        style={{ minHeight: 0, background: "#050505" }}
         ref={containerRef}
         onScroll={handleScroll}
       >
         {loadingMore && (
-          <div className="text-center text-[10px] text-white/30 py-2">
+          <div className="text-center text-[10px] py-2" style={{ color: "rgba(255,255,255,0.3)" }}>
             Loading older messages...
           </div>
         )}
@@ -198,11 +198,11 @@ const SingleChat = ({ fetchagain, setFetchagain }) => {
         {Object.entries(groupedMessages).map(([date, msgs]) => (
           <div key={date}>
             <div className="flex items-center gap-4 my-6">
-              <div className="flex-1 h-px bg-white/5" />
-              <span className="text-[9px] font-bold text-white/20 uppercase tracking-[2px]">
+              <div className="flex-1 h-px" style={{ background: "rgba(255,255,255,0.05)" }} />
+              <span className="text-[9px] font-bold uppercase tracking-[2px]" style={{ color: "rgba(255,255,255,0.2)" }}>
                 {date}
               </span>
-              <div className="flex-1 h-px bg-white/5" />
+              <div className="flex-1 h-px" style={{ background: "rgba(255,255,255,0.05)" }} />
             </div>
 
             <div className="space-y-2">
@@ -214,20 +214,13 @@ const SingleChat = ({ fetchagain, setFetchagain }) => {
                     className={`flex ${isMine ? "justify-end" : "justify-start"}`}
                   >
                     <div
-                      className="max-w-[82%] px-5 py-3.5 text-[14.5px] leading-relaxed text-white"
+                      className="max-w-[82%] px-5 py-3.5 text-[14.5px] leading-relaxed"
                       style={{
-                        borderRadius: isMine
-                          ? "24px 24px 4px 24px"
-                          : "24px 24px 24px 4px",
-                        backgroundColor: isMine
-                          ? rgba(accentColor, 0.18)
-                          : "rgba(255,255,255,0.04)",
-                        border: `1px solid ${
-                          isMine
-                            ? rgba(accentColor, 0.3)
-                            : "rgba(255,255,255,0.08)"
-                        }`,
-                        backdropFilter: "blur(15px)",
+                        borderRadius: isMine ? "24px 24px 4px 24px" : "24px 24px 24px 4px",
+                        backgroundColor: isMine ? rgba(accentColor, 0.18) : "rgba(255,255,255,0.06)",
+                        border: `1px solid ${isMine ? rgba(accentColor, 0.3) : "rgba(255,255,255,0.08)"}`,
+                        color: "#fff",
+                        // backdropFilter HATA DIYA — Android WebView crash karta tha
                       }}
                     >
                       {m.content}
@@ -240,7 +233,10 @@ const SingleChat = ({ fetchagain, setFetchagain }) => {
         ))}
 
         {isTyping && (
-          <div className="flex gap-1.5 p-3 mt-2 w-fit bg-white/5 rounded-2xl border border-white/10">
+          <div
+            className="flex gap-1.5 p-3 mt-2 w-fit rounded-2xl"
+            style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}
+          >
             <div className="typing-dot" style={{ background: accentColor, animationDelay: "0s" }} />
             <div className="typing-dot" style={{ background: accentColor, animationDelay: "0.2s" }} />
             <div className="typing-dot" style={{ background: accentColor, animationDelay: "0.4s" }} />
@@ -250,9 +246,15 @@ const SingleChat = ({ fetchagain, setFetchagain }) => {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* ── FOOTER / INPUT ── */}
-      <footer className="flex-shrink-0 p-5 bg-black/40 backdrop-blur-3xl border-t border-white/5">
-        <div className="flex items-center gap-3 bg-white/[0.04] border border-white/10 pl-6 pr-2 py-2 rounded-[28px]">
+      {/* FOOTER — backdrop-blur-3xl hataya */}
+      <footer
+        className="flex-shrink-0 p-5"
+        style={{ background: "#0a0a0a", borderTop: "1px solid rgba(255,255,255,0.05)" }}
+      >
+        <div
+          className="flex items-center gap-3 pl-6 pr-2 py-2 rounded-[28px]"
+          style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)" }}
+        >
           <input
             value={newMessage}
             onChange={typingHandler}
