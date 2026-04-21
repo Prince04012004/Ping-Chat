@@ -4,8 +4,18 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 
-    <!-- ✅ interactive-widget=resizes-content: keyboard open hone par viewport shrink hoga properly -->
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
+
+    <!-- Capacitor Android WebView fix -->
+    <style>
+      html, body, #root {
+        height: 100%;
+        width: 100%;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+      }
+    </style>
 
     <title>vite-project</title>
     <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Kalam:wght@400;700&family=Noto+Sans+KR:wght@400;700&family=Orbitron:wght@400;900&display=swap" rel="stylesheet">

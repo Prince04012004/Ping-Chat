@@ -16,7 +16,7 @@ const Chatpage = () => {
 
   return (
     <div
-      style={{ height: "100dvh" }}
+      style={{ height: "100vh" }}
       className="w-full bg-[#05070a] flex items-center justify-center p-0 md:p-6 overflow-hidden font-sans relative"
     >
       {/* Background Blobs */}
