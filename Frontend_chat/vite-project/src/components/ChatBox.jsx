@@ -5,14 +5,13 @@ import ProfileModal from "../pages/Profile";
 import SingleChat from "../components/Singlechat";
 
 const ChatBox = ({ fetchagain, setFetchagain }) => {
-  const { selectedChat, setSelectedChat, user, config, hexToRGBA } = ChatState();
+  const { selectedChat, setSelectedChat, user, config } = ChatState();
   const [showMenu, setShowMenu] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [profileUser, setProfileUser] = useState(null);
 
   const accentColor = config?.accent || "#10b981";
 
-  // Wahi logic jo Mychats mein hai
   const rgba = (hex, alpha) => {
     try {
       const r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
@@ -53,12 +52,12 @@ const ChatBox = ({ fetchagain, setFetchagain }) => {
   return (
     <>
       <div 
-        className={`relative h-full flex-col overflow-hidden w-full transition-all duration-500 ${
+        className={`relative h-full flex flex-col w-full transition-all duration-500 ${
           selectedChat ? 'flex' : 'hidden md:flex'
         }`}
         style={{ fontFamily: config.font, background: "#050505" }}
       >
-        {/* ✅ SYNCED BACKGROUND — Mychats jaisa layered gradient */}
+        {/* Background Layers - Synced with Mychats */}
         <div className="absolute inset-0 z-0" style={{
           background: `
             radial-gradient(ellipse at 80% 20%, ${rgba(accentColor, 0.06)} 0%, transparent 50%),
@@ -67,7 +66,6 @@ const ChatBox = ({ fetchagain, setFetchagain }) => {
           `
         }} />
 
-        {/* Grid overlay - matched size */}
         <div className="absolute inset-0 z-0 pointer-events-none" style={{
           backgroundImage: `
             linear-gradient(${rgba(accentColor, 0.03)} 1px, transparent 1px),
@@ -76,7 +74,6 @@ const ChatBox = ({ fetchagain, setFetchagain }) => {
           backgroundSize: '40px 40px'
         }} />
 
-        {/* Profile Modal */}
         {isProfileOpen && (
           <ProfileModal
             isOpen={isProfileOpen}
@@ -85,10 +82,14 @@ const ChatBox = ({ fetchagain, setFetchagain }) => {
           />
         )}
 
-        {/* Header */}
+        {/* ✅ FIXED HEADER - Increased z-index and removed overflow issues */}
         <header 
-          className="flex-shrink-0 h-[70px] md:h-[85px] flex items-center justify-between px-6 z-10 relative"
-          style={{ borderBottom: "1px solid rgba(255,255,255,0.05)", background: "rgba(10,10,12,0.4)", backdropFilter: "blur(10px)" }}
+          className="flex-shrink-0 h-[70px] md:h-[85px] flex items-center justify-between px-6 z-[100] relative"
+          style={{ 
+            borderBottom: "1px solid rgba(255,255,255,0.05)", 
+            background: "rgba(10,10,12,0.4)", 
+            backdropFilter: "blur(10px)" 
+          }}
         >
           <div className="flex items-center gap-4">
             <button
@@ -103,7 +104,7 @@ const ChatBox = ({ fetchagain, setFetchagain }) => {
 
             <div onClick={handleViewProfile} className="flex items-center gap-3 cursor-pointer group">
               <div
-                className="w-10 h-10 md:w-11 md:h-11 rounded-2xl border flex items-center justify-center font-black text-lg transition-transform group-hover:rotate-6"
+                className="w-10 h-10 md:w-11 md:h-11 rounded-2xl border flex items-center justify-center font-black text-lg transition-transform group-hover:rotate-6 overflow-hidden"
                 style={{ 
                   borderColor: rgba(accentColor, 0.3), 
                   color: accentColor, 
@@ -112,7 +113,7 @@ const ChatBox = ({ fetchagain, setFetchagain }) => {
                 }}
               >
                 {receiver.profilepic ? (
-                  <img src={receiver.profilepic} className="w-full h-full object-cover rounded-2xl" alt="p" />
+                  <img src={receiver.profilepic} className="w-full h-full object-cover" alt="p" />
                 ) : (
                   receiver.name?.charAt(0)?.toUpperCase() || "?"
                 )}
@@ -128,35 +129,35 @@ const ChatBox = ({ fetchagain, setFetchagain }) => {
             </div>
           </div>
 
-          {/* Menu */}
+          {/* ✅ FIXED MENU - Using z-[110] and top-[80%] to stay visible */}
           <div className="relative">
             <button
               onClick={() => setShowMenu(!showMenu)}
-              className="p-2 text-zinc-500 hover:text-white transition-colors text-xl"
+              className="p-2 text-zinc-500 hover:text-white transition-colors text-xl font-bold"
             >
               ⋮
             </button>
             {showMenu && (
               <>
-                <div className="fixed inset-0 z-[190]" onClick={() => setShowMenu(false)} />
+                <div className="fixed inset-0 z-[105]" onClick={() => setShowMenu(false)} />
                 <div
-                  className="absolute right-0 top-[110%] w-48 rounded-2xl overflow-hidden z-[200]"
+                  className="absolute right-0 top-[80%] w-48 rounded-2xl overflow-hidden z-[110] animate-in fade-in slide-in-from-top-2 duration-200"
                   style={{
-                    background: "#0f0f0f",
+                    background: "#0f0f11",
                     border: `1px solid ${rgba(accentColor, 0.2)}`,
-                    boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
+                    boxShadow: "0 10px 40px rgba(0,0,0,0.8)",
                   }}
                 >
                   <button
                     onClick={handleViewProfile}
-                    className="w-full px-4 py-3.5 text-[11px] text-white/70 hover:bg-white/5 text-left uppercase font-bold tracking-widest"
+                    className="w-full px-4 py-4 text-[11px] text-white/70 hover:bg-white/5 text-left uppercase font-bold tracking-widest transition-colors"
                     style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}
                   >
                     View Identity
                   </button>
                   <button
                     onClick={handleBlockUser}
-                    className="w-full px-4 py-3.5 text-[11px] text-red-500 hover:bg-red-500/10 text-left uppercase font-black tracking-widest"
+                    className="w-full px-4 py-4 text-[11px] text-red-500 hover:bg-red-500/10 text-left uppercase font-black tracking-widest transition-colors"
                   >
                     Block User
                   </button>
@@ -166,7 +167,7 @@ const ChatBox = ({ fetchagain, setFetchagain }) => {
           </div>
         </header>
 
-        {/* SingleChat Component Area */}
+        {/* Chat Area */}
         <div className="flex-1 flex flex-col overflow-hidden relative z-10">
           <SingleChat fetchagain={fetchagain} setFetchagain={setFetchagain} />
         </div>
