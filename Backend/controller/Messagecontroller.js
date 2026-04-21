@@ -40,36 +40,40 @@ export const sendMessage=async(req,res)=>{
 }
 
 // all messages
-
 export const allmessages = async (req, res) => {
     try {
         const { chatid } = req.params;
+
+        if (!chatid) {
+            return res.status(400).json({ message: "Chat ID is required" });
+        }
         
-        // Frontend se 'page' mangwayenge, default 1 hoga
         const page = parseInt(req.query.page) || 1; 
-        const limit = 20; // Ek baar mein sirf 20 messages mangwayenge
+        const limit = 20; 
         const skip = (page - 1) * limit;
 
         const messages = await Message.find({ chat: chatid })
             .populate("sender", "name profilepic email")
             .populate("chat")
-            .sort({ createdAt: -1 }) // Sabse naye messages pehle (Taki skip sahi kaam kare)
+            .sort({ createdAt: -1 }) 
             .skip(skip)
             .limit(limit);
 
-        // Check karne ke liye ki kya aur messages bache hain
         const totalMessages = await Message.countDocuments({ chat: chatid });
         const hasMore = skip + messages.length < totalMessages;
 
-        res.json({
-            messages: messages.reverse(), // Reverse taaki UI mein purane upar aur naye niche dikhein
+        // Black screen se bachne ke liye hamesha 'messages' key bhejni hai, bhale hi empty ho
+        res.status(200).json({
+            messages: messages && messages.length > 0 ? messages.reverse() : [], 
             hasMore,
             totalMessages
         });
     }
     catch (err) {
+        console.error("Backend Error:", err);
         res.status(400).json({
-            message: err.message
+            message: err.message,
+            messages: [] // Error ke time bhi empty array bhejo taaki frontend crash na ho
         });
     }
 }
