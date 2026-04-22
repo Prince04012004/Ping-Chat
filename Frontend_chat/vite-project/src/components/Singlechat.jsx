@@ -12,14 +12,12 @@ const MOOD_COLORS = [
   "#3b82f6", "#a855f7",
 ];
 
-// Quick emojis for picker
 const QUICK_EMOJIS = [
   "😂", "❤️", "🔥", "😍", "🥹",
   "💀", "🤯", "😎", "🥰", "👑",
   "💯", "🚀", "✨", "🫶", "😭",
 ];
 
-// 🔊 Click sound
 const playClickSound = () => {
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -46,18 +44,19 @@ const SingleChat = ({ fetchagain, setFetchagain, onMoodChange }) => {
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
 
-  // 🎨 Mood
   const [moodIndex, setMoodIndex] = useState(0);
   const [otherMoodIndex, setOtherMoodIndex] = useState(0);
   const moodIndexRef = useRef(0);
 
-  // 😂 Emoji picker + fullscreen
   const [showPicker, setShowPicker] = useState(false);
   const [flyingEmoji, setFlyingEmoji] = useState(null);
 
-  // 🗑️ Delete menu
+  // 🗑️ Delete menu — state mein sirf messageId store
   const [activeMenu, setActiveMenu] = useState(null);
-  const [longPressTimer, setLongPressTimer] = useState(null);
+  // Ref use karo timer ke liye — state se re-render issue hota tha
+  const longPressTimerRef = useRef(null);
+  // Track karo ki long press hua ya normal tap
+  const isLongPressRef = useRef(false);
 
   const messagesEndRef = useRef(null);
   const containerRef = useRef(null);
@@ -107,7 +106,6 @@ const SingleChat = ({ fetchagain, setFetchagain, onMoodChange }) => {
     };
   }, []);
 
-  // 😂 Show flying emoji on screen
   const showFlyingEmoji = (emoji) => {
     const id = Date.now();
     setFlyingEmoji({ emoji, id });
@@ -122,18 +120,15 @@ const SingleChat = ({ fetchagain, setFetchagain, onMoodChange }) => {
     socketInstance.on("typing", () => setIsTyping(true));
     socketInstance.on("stop typing", () => setIsTyping(false));
 
-    // 🎨 Mood sync
     socketInstance.on("mood change", ({ moodIndex: idx }) => {
       setOtherMoodIndex(idx);
       onMoodChange?.(MOOD_COLORS[idx]);
     });
 
-    // 😂 Emoji reaction — fullscreen pe dikha do
     socketInstance.on("emoji reaction", ({ emoji }) => {
       showFlyingEmoji(emoji);
     });
 
-    // 🗑️ Delete for everyone — dusre user ki screen pe bhi update
     socketInstance.on("message deleted", ({ messageId }) => {
       setMessages((prev) =>
         prev.map((m) =>
@@ -230,7 +225,6 @@ const SingleChat = ({ fetchagain, setFetchagain, onMoodChange }) => {
     }
   };
 
-  // 🗑️ Delete message
   const handleDelete = async (messageId, deleteForEveryone) => {
     setActiveMenu(null);
     try {
@@ -239,7 +233,6 @@ const SingleChat = ({ fetchagain, setFetchagain, onMoodChange }) => {
         ...getAuthHeader(),
       });
       if (deleteForEveryone) {
-        // "Deleted for everyone" text dikhao
         setMessages((prev) =>
           prev.map((m) =>
             m._id === messageId
@@ -247,14 +240,11 @@ const SingleChat = ({ fetchagain, setFetchagain, onMoodChange }) => {
               : m
           )
         );
-        // Socket se dusre user ko bhi batao
         socketInstance?.emit("message deleted", {
           messageId,
           chatId: selectedChat._id,
-          deleteForEveryone: true,
         });
       } else {
-        // Sirf apni list se hata do
         setMessages((prev) => prev.filter((m) => m._id !== messageId));
       }
     } catch (err) {
@@ -262,12 +252,9 @@ const SingleChat = ({ fetchagain, setFetchagain, onMoodChange }) => {
     }
   };
 
-  // 😂 Send emoji reaction
   const sendEmojiReaction = (emoji) => {
     setShowPicker(false);
-    // Apni screen pe dikhao
     showFlyingEmoji(emoji);
-    // Dusre user ko bhejo
     socketInstance?.emit("emoji reaction", {
       chatId: selectedChat._id,
       emoji,
@@ -277,7 +264,6 @@ const SingleChat = ({ fetchagain, setFetchagain, onMoodChange }) => {
   const typingHandler = (e) => {
     setNewMessage(e.target.value);
     playClickSound();
-
     const nextIndex = (moodIndexRef.current + 1) % MOOD_COLORS.length;
     moodIndexRef.current = nextIndex;
     setMoodIndex(nextIndex);
@@ -286,7 +272,6 @@ const SingleChat = ({ fetchagain, setFetchagain, onMoodChange }) => {
       chatId: selectedChat._id,
       moodIndex: nextIndex,
     });
-
     if (!typing) {
       setTyping(true);
       socketInstance?.emit("typing", selectedChat._id);
@@ -298,6 +283,29 @@ const SingleChat = ({ fetchagain, setFetchagain, onMoodChange }) => {
         setTyping(false);
       }
     }, 3000);
+  };
+
+  // ✅ Long press handlers — ref use kar rahe hain timer ke liye
+  const handleTouchStart = (msgId) => {
+    isLongPressRef.current = false;
+    longPressTimerRef.current = setTimeout(() => {
+      isLongPressRef.current = true;
+      setActiveMenu(msgId);
+    }, 500);
+  };
+
+  const handleTouchEnd = (e) => {
+    clearTimeout(longPressTimerRef.current);
+    // Agar long press hua toh scroll/tap prevent karo
+    if (isLongPressRef.current) {
+      e.preventDefault();
+    }
+  };
+
+  const handleTouchMove = () => {
+    // Scroll karne par long press cancel ho
+    clearTimeout(longPressTimerRef.current);
+    isLongPressRef.current = false;
   };
 
   const groupedMessages = messages.reduce((groups, msg) => {
@@ -326,9 +334,20 @@ const SingleChat = ({ fetchagain, setFetchagain, onMoodChange }) => {
         .sc-scroll::-webkit-scrollbar-thumb {
           background: ${rgba(accentColor, 0.4)}; border-radius: 10px;
         }
-        .msg-bubble { transition: background-color 0.4s ease, border-color 0.4s ease; }
-
-        /* 😂 Flying emoji animation */
+        .msg-bubble {
+          transition: background-color 0.4s ease, border-color 0.4s ease;
+          /* Long press pe text select band karo mobile pe */
+          -webkit-user-select: none;
+          user-select: none;
+        }
+        /* Delete menu animation */
+        @keyframes menuIn {
+          from { opacity: 0; transform: scale(0.9) translateY(6px); }
+          to   { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        .delete-menu {
+          animation: menuIn 0.15s ease forwards;
+        }
         @keyframes emojiFloat {
           0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.3); }
           20%  { opacity: 1; transform: translate(-50%, -50%) scale(1.3); }
@@ -344,27 +363,31 @@ const SingleChat = ({ fetchagain, setFetchagain, onMoodChange }) => {
           animation: emojiFloat 2s ease forwards;
           filter: drop-shadow(0 0 30px rgba(255,255,255,0.3));
         }
-
-        /* Emoji picker */
         @keyframes pickerIn {
           from { opacity: 0; transform: translateY(10px) scale(0.95); }
           to   { opacity: 1; transform: translateY(0) scale(1); }
         }
-        .emoji-picker {
-          animation: pickerIn 0.2s ease forwards;
-        }
+        .emoji-picker { animation: pickerIn 0.2s ease forwards; }
       `}</style>
 
-      {/* 😂 Full screen flying emoji */}
       {flyingEmoji && (
         <div key={flyingEmoji.id} className="flying-emoji">
           {flyingEmoji.emoji}
         </div>
       )}
 
+      {/* Backdrop — activeMenu ho toh bahar tap se close ho */}
+      {activeMenu && (
+        <div
+          className="fixed inset-0 z-40"
+          onTouchStart={() => setActiveMenu(null)}
+          onClick={() => setActiveMenu(null)}
+        />
+      )}
+
       {/* MESSAGES */}
       <div
-        className="sc-scroll flex-1 overflow-y-auto px-5 py-6"
+        className="sc-scroll flex-1 overflow-y-auto px-4 py-6"
         style={{ minHeight: 0, background: "transparent" }}
         ref={containerRef}
         onScroll={handleScroll}
@@ -388,56 +411,83 @@ const SingleChat = ({ fetchagain, setFetchagain, onMoodChange }) => {
             <div className="space-y-2">
               {msgs.map((m, i) => {
                 const isMine = (m.sender?._id || m.sender) === myId;
+                const isDeleted = m.deletedForEveryone;
+
                 return (
-                  <div key={m._id || i} className={`flex ${isMine ? "justify-end" : "justify-start"}`}
-                    onContextMenu={(e) => { e.preventDefault(); setActiveMenu(m._id); }}
-                    onTouchStart={() => {
-                      const t = setTimeout(() => setActiveMenu(m._id), 500);
-                      setLongPressTimer(t);
-                    }}
-                    onTouchEnd={() => clearTimeout(longPressTimer)}
+                  <div
+                    key={m._id || i}
+                    className={`flex ${isMine ? "justify-end" : "justify-start"}`}
                   >
-                    {/* Delete menu */}
-                    {activeMenu === m._id && (
-                      <>
-                        <div className="fixed inset-0 z-40" onClick={() => setActiveMenu(null)} />
+                    {/* 
+                      Wrapper — relative position taaki menu sahi jagah aaye
+                      inline-flex taaki wrapper sirf bubble jitna wide ho
+                    */}
+                    <div
+                      className="relative"
+                      style={{ display: "inline-flex", maxWidth: "82%" }}
+                      onContextMenu={(e) => { e.preventDefault(); setActiveMenu(m._id); }}
+                      onTouchStart={() => handleTouchStart(m._id)}
+                      onTouchEnd={handleTouchEnd}
+                      onTouchMove={handleTouchMove}
+                    >
+                      {/* Delete menu */}
+                      {activeMenu === m._id && !isDeleted && (
                         <div
-                          className="absolute z-50 rounded-2xl overflow-hidden shadow-2xl"
+                          className="delete-menu absolute z-50 rounded-2xl overflow-hidden shadow-2xl"
                           style={{
-                            background: "#111",
-                            border: `1px solid ${rgba(accentColor, 0.25)}`,
-                            [isMine ? "right" : "left"]: "0",
-                            bottom: "110%",
+                            background: "#1a1a1a",
+                            border: `1px solid ${rgba(accentColor, 0.3)}`,
+                            boxShadow: `0 8px 32px rgba(0,0,0,0.8), 0 0 20px ${rgba(accentColor, 0.1)}`,
+                            // Menu ko bubble ke upar dikhao
+                            bottom: "calc(100% + 8px)",
+                            // Sender ke liye right align, receiver ke liye left
+                            ...(isMine ? { right: 0 } : { left: 0 }),
+                            minWidth: "200px",
                           }}
                         >
                           {isMine && (
                             <button
+                              onTouchStart={(e) => e.stopPropagation()}
                               onClick={() => handleDelete(m._id, true)}
-                              className="flex items-center gap-3 px-4 py-3 text-[13px] text-red-400 font-bold w-full text-left hover:bg-red-500/10 transition-colors"
-                              style={{ borderBottom: `1px solid rgba(255,255,255,0.06)` }}
+                              className="flex items-center gap-3 px-5 py-3.5 text-[13px] text-red-400 font-bold w-full text-left active:bg-red-500/10"
+                              style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}
                             >
                               🗑️ Delete for Everyone
                             </button>
                           )}
                           <button
+                            onTouchStart={(e) => e.stopPropagation()}
                             onClick={() => handleDelete(m._id, false)}
-                            className="flex items-center gap-3 px-4 py-3 text-[13px] text-white/70 w-full text-left hover:bg-white/5 transition-colors"
+                            className="flex items-center gap-3 px-5 py-3.5 text-[13px] text-white/70 w-full text-left active:bg-white/5"
                           >
                             🙈 Delete for Me
                           </button>
                         </div>
-                      </>
-                    )}
-                    <div
-                      className="msg-bubble max-w-[82%] px-5 py-3.5 text-[14.5px] leading-relaxed relative"
-                      style={{
-                        borderRadius: isMine ? "24px 24px 4px 24px" : "24px 24px 24px 4px",
-                        backgroundColor: isMine ? rgba(accentColor, 0.2) : "rgba(255,255,255,0.08)",
-                        border: `1px solid ${isMine ? rgba(accentColor, 0.4) : "rgba(255,255,255,0.12)"}`,
-                        color: "#fff",
-                      }}
-                    >
-                      {m.content}
+                      )}
+
+                      {/* Message bubble */}
+                      <div
+                        className="msg-bubble px-5 py-3.5 text-[14.5px] leading-relaxed"
+                        style={{
+                          borderRadius: isMine ? "20px 20px 4px 20px" : "20px 20px 20px 4px",
+                          backgroundColor: isDeleted
+                            ? "rgba(255,255,255,0.03)"
+                            : isMine
+                            ? rgba(accentColor, 0.2)
+                            : "rgba(255,255,255,0.08)",
+                          border: `1px solid ${
+                            isDeleted
+                              ? "rgba(255,255,255,0.06)"
+                              : isMine
+                              ? rgba(accentColor, 0.4)
+                              : "rgba(255,255,255,0.12)"
+                          }`,
+                          color: isDeleted ? "rgba(255,255,255,0.3)" : "#fff",
+                          fontStyle: isDeleted ? "italic" : "normal",
+                        }}
+                      >
+                        {m.content}
+                      </div>
                     </div>
                   </div>
                 );
@@ -473,7 +523,6 @@ const SingleChat = ({ fetchagain, setFetchagain, onMoodChange }) => {
           transition: "border-color 0.4s ease",
         }}
       >
-        {/* 😂 Emoji Picker — 3 dots button se khulega */}
         {showPicker && (
           <div
             ref={pickerRef}
@@ -510,14 +559,12 @@ const SingleChat = ({ fetchagain, setFetchagain, onMoodChange }) => {
             transition: "all 0.4s ease",
           }}
         >
-          {/* 😂 3-dots emoji button */}
           <button
             onClick={() => setShowPicker((p) => !p)}
             className="flex-shrink-0 w-9 h-9 flex items-center justify-center rounded-xl active:scale-90 transition-all"
             style={{
               background: showPicker ? rgba(accentColor, 0.2) : rgba(accentColor, 0.08),
               color: accentColor,
-              transition: "all 0.3s ease",
             }}
           >
             <span style={{ fontSize: "18px", letterSpacing: "-2px", lineHeight: 1 }}>•••</span>
