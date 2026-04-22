@@ -72,8 +72,13 @@ io.on("connection", (socket) => {
     // 😂 Emoji reaction — full screen animation dono users ko
     socket.on("emoji reaction", ({ chatId, emoji }) => {
         if (!chatId || !emoji) return;
-        // Sender ko bhi bhejo + receiver ko bhi
         io.in(chatId).emit("emoji reaction", { emoji });
+    });
+
+    // 🗑️ Delete for everyone — dusre user ko batao
+    socket.on("message deleted", ({ messageId, chatId }) => {
+        if (!messageId || !chatId) return;
+        socket.in(chatId).emit("message deleted", { messageId });
     });
 
     socket.on("new message", (newMessagereceived) => {

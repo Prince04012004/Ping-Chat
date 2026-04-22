@@ -1,34 +1,39 @@
 import mongoose from "mongoose";
 
-const messageSchema=new mongoose.Schema({
-    sender:{
-        type:mongoose.Schema.Types.ObjectId,
-        ref:"User",
-
+const messageSchema = new mongoose.Schema({
+    sender: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
     },
-    // the user typing the message
-    content:{
-        type:String,
-        trim:true,
-        required:true
+    content: {
+        type: String,
+        trim: true,
+        required: true
     },
-    //for chat id
-
-    chat:{
-        type:mongoose.Schema.Types.ObjectId,
-        ref:"Chat"
-
+    chat: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Chat"
     },
-    aisuggestion:{
-        type:String,
-        default:""
+    aisuggestion: {
+        type: String,
+        default: ""
     },
+    readby: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User"
+    }],
+    // ✅ "Delete for me" — sirf un users ke liye hide hoga
+    deletedFor: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User"
+    }],
+    // ✅ "Delete for everyone" — poora message delete
+    deletedForEveryone: {
+        type: Boolean,
+        default: false
+    }
+}, {
+    timestamps: true
+});
 
-    readby:[{
-           type:mongoose.Schema.Types.ObjectId,
-           ref:"User"
-    }]
-},{
-    timestamps:true
-})
-export default mongoose.model("Message",messageSchema)
+export default mongoose.model("Message", messageSchema);

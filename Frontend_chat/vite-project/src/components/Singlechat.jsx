@@ -53,7 +53,11 @@ const SingleChat = ({ fetchagain, setFetchagain, onMoodChange }) => {
 
   // 😂 Emoji picker + fullscreen
   const [showPicker, setShowPicker] = useState(false);
-  const [flyingEmoji, setFlyingEmoji] = useState(null); // { emoji, id }
+  const [flyingEmoji, setFlyingEmoji] = useState(null);
+
+  // 🗑️ Delete menu
+  const [activeMenu, setActiveMenu] = useState(null);
+  const [longPressTimer, setLongPressTimer] = useState(null);
 
   const messagesEndRef = useRef(null);
   const containerRef = useRef(null);
@@ -127,6 +131,17 @@ const SingleChat = ({ fetchagain, setFetchagain, onMoodChange }) => {
     // 😂 Emoji reaction — fullscreen pe dikha do
     socketInstance.on("emoji reaction", ({ emoji }) => {
       showFlyingEmoji(emoji);
+    });
+
+    // 🗑️ Delete for everyone — dusre user ki screen pe bhi update
+    socketInstance.on("message deleted", ({ messageId }) => {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m._id === messageId
+            ? { ...m, content: "This message was deleted", deletedForEveryone: true }
+            : m
+        )
+      );
     });
 
     socketInstance.on("message received", (newMsg) => {
@@ -212,6 +227,38 @@ const SingleChat = ({ fetchagain, setFetchagain, onMoodChange }) => {
       } catch (err) {
         console.error("Send error:", err);
       }
+    }
+  };
+
+  // 🗑️ Delete message
+  const handleDelete = async (messageId, deleteForEveryone) => {
+    setActiveMenu(null);
+    try {
+      await API.delete(`/api/deletemessage/${messageId}`, {
+        data: { deleteForEveryone },
+        ...getAuthHeader(),
+      });
+      if (deleteForEveryone) {
+        // "Deleted for everyone" text dikhao
+        setMessages((prev) =>
+          prev.map((m) =>
+            m._id === messageId
+              ? { ...m, content: "This message was deleted", deletedForEveryone: true }
+              : m
+          )
+        );
+        // Socket se dusre user ko bhi batao
+        socketInstance?.emit("message deleted", {
+          messageId,
+          chatId: selectedChat._id,
+          deleteForEveryone: true,
+        });
+      } else {
+        // Sirf apni list se hata do
+        setMessages((prev) => prev.filter((m) => m._id !== messageId));
+      }
+    } catch (err) {
+      console.error("Delete error:", err);
     }
   };
 
@@ -341,15 +388,52 @@ const SingleChat = ({ fetchagain, setFetchagain, onMoodChange }) => {
             <div className="space-y-2">
               {msgs.map((m, i) => {
                 const isMine = (m.sender?._id || m.sender) === myId;
-                const bubbleColor = isMine ? accentColor : MOOD_COLORS[otherMoodIndex];
                 return (
-                  <div key={m._id || i} className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
+                  <div key={m._id || i} className={`flex ${isMine ? "justify-end" : "justify-start"}`}
+                    onContextMenu={(e) => { e.preventDefault(); setActiveMenu(m._id); }}
+                    onTouchStart={() => {
+                      const t = setTimeout(() => setActiveMenu(m._id), 500);
+                      setLongPressTimer(t);
+                    }}
+                    onTouchEnd={() => clearTimeout(longPressTimer)}
+                  >
+                    {/* Delete menu */}
+                    {activeMenu === m._id && (
+                      <>
+                        <div className="fixed inset-0 z-40" onClick={() => setActiveMenu(null)} />
+                        <div
+                          className="absolute z-50 rounded-2xl overflow-hidden shadow-2xl"
+                          style={{
+                            background: "#111",
+                            border: `1px solid ${rgba(accentColor, 0.25)}`,
+                            [isMine ? "right" : "left"]: "0",
+                            bottom: "110%",
+                          }}
+                        >
+                          {isMine && (
+                            <button
+                              onClick={() => handleDelete(m._id, true)}
+                              className="flex items-center gap-3 px-4 py-3 text-[13px] text-red-400 font-bold w-full text-left hover:bg-red-500/10 transition-colors"
+                              style={{ borderBottom: `1px solid rgba(255,255,255,0.06)` }}
+                            >
+                              🗑️ Delete for Everyone
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleDelete(m._id, false)}
+                            className="flex items-center gap-3 px-4 py-3 text-[13px] text-white/70 w-full text-left hover:bg-white/5 transition-colors"
+                          >
+                            🙈 Delete for Me
+                          </button>
+                        </div>
+                      </>
+                    )}
                     <div
-                      className="msg-bubble max-w-[82%] px-5 py-3.5 text-[14.5px] leading-relaxed"
+                      className="msg-bubble max-w-[82%] px-5 py-3.5 text-[14.5px] leading-relaxed relative"
                       style={{
                         borderRadius: isMine ? "24px 24px 4px 24px" : "24px 24px 24px 4px",
-                        backgroundColor: rgba(bubbleColor, 0.18),
-                        border: `1px solid ${rgba(bubbleColor, 0.35)}`,
+                        backgroundColor: isMine ? rgba(accentColor, 0.2) : "rgba(255,255,255,0.08)",
+                        border: `1px solid ${isMine ? rgba(accentColor, 0.4) : "rgba(255,255,255,0.12)"}`,
                         color: "#fff",
                       }}
                     >

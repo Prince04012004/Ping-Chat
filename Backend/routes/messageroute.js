@@ -9,5 +9,6 @@ const router=express.Router()
 
 router.post('/sendmessage',auth,sendMessage);
 router.get('/allmessages/:chatid',auth,allmessages)
+router.delete("/deletemessage/:messageId", auth, deleteMessage);
 
 export default router;
