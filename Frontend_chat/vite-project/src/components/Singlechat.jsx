@@ -6,7 +6,38 @@ import { ChatState } from "../Context/ChatProvider";
 const ENDPOINT = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
 let socketInstance = null;
 
-const SingleChat = ({ fetchagain, setFetchagain }) => {
+const MOOD_COLORS = [
+  "#6366f1", "#8b5cf6", "#ec4899", "#f43f5e",
+  "#f97316", "#eab308", "#22c55e", "#06b6d4",
+  "#3b82f6", "#a855f7",
+];
+
+// Quick emojis for picker
+const QUICK_EMOJIS = [
+  "😂", "❤️", "🔥", "😍", "🥹",
+  "💀", "🤯", "😎", "🥰", "👑",
+  "💯", "🚀", "✨", "🫶", "😭",
+];
+
+// 🔊 Click sound
+const playClickSound = () => {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(800, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(400, ctx.currentTime + 0.05);
+    gain.gain.setValueAtTime(0.15, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.08);
+  } catch (e) {}
+};
+
+const SingleChat = ({ fetchagain, setFetchagain, onMoodChange }) => {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
   const [typing, setTyping] = useState(false);
@@ -15,13 +46,22 @@ const SingleChat = ({ fetchagain, setFetchagain }) => {
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
 
+  // 🎨 Mood
+  const [moodIndex, setMoodIndex] = useState(0);
+  const [otherMoodIndex, setOtherMoodIndex] = useState(0);
+  const moodIndexRef = useRef(0);
+
+  // 😂 Emoji picker + fullscreen
+  const [showPicker, setShowPicker] = useState(false);
+  const [flyingEmoji, setFlyingEmoji] = useState(null); // { emoji, id }
+
   const messagesEndRef = useRef(null);
   const containerRef = useRef(null);
   const selectedChatRef = useRef(null);
+  const pickerRef = useRef(null);
 
-  // Wapas purane state par — config se accentColor lena
   const { user, selectedChat, setNotification, config, hexToRGBA } = ChatState();
-  const accentColor = config?.accent || "#10b981";
+  const accentColor = MOOD_COLORS[moodIndex];
   const myId = user?.user?._id || user?._id;
 
   const rgba = hexToRGBA
@@ -32,7 +72,7 @@ const SingleChat = ({ fetchagain, setFetchagain }) => {
           const g = parseInt(hex.slice(3, 5), 16);
           const b = parseInt(hex.slice(5, 7), 16);
           return `rgba(${r},${g},${b},${alpha})`;
-        } catch { return `rgba(16,185,129,${alpha})`; }
+        } catch { return `rgba(99,102,241,${alpha})`; }
       };
 
   const getAuthHeader = () => {
@@ -48,7 +88,28 @@ const SingleChat = ({ fetchagain, setFetchagain }) => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  // Socket setup
+  // Close picker on outside click
+  useEffect(() => {
+    const handler = (e) => {
+      if (pickerRef.current && !pickerRef.current.contains(e.target)) {
+        setShowPicker(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    document.addEventListener("touchstart", handler);
+    return () => {
+      document.removeEventListener("mousedown", handler);
+      document.removeEventListener("touchstart", handler);
+    };
+  }, []);
+
+  // 😂 Show flying emoji on screen
+  const showFlyingEmoji = (emoji) => {
+    const id = Date.now();
+    setFlyingEmoji({ emoji, id });
+    setTimeout(() => setFlyingEmoji(null), 2000);
+  };
+
   useEffect(() => {
     if (!user) return;
     socketInstance = io(ENDPOINT);
@@ -56,6 +117,17 @@ const SingleChat = ({ fetchagain, setFetchagain }) => {
 
     socketInstance.on("typing", () => setIsTyping(true));
     socketInstance.on("stop typing", () => setIsTyping(false));
+
+    // 🎨 Mood sync
+    socketInstance.on("mood change", ({ moodIndex: idx }) => {
+      setOtherMoodIndex(idx);
+      onMoodChange?.(MOOD_COLORS[idx]);
+    });
+
+    // 😂 Emoji reaction — fullscreen pe dikha do
+    socketInstance.on("emoji reaction", ({ emoji }) => {
+      showFlyingEmoji(emoji);
+    });
 
     socketInstance.on("message received", (newMsg) => {
       const currentChat = selectedChatRef.current;
@@ -80,7 +152,11 @@ const SingleChat = ({ fetchagain, setFetchagain }) => {
         `/api/allmessages/${selectedChat._id}?page=${pageNum}`,
         getAuthHeader()
       );
-      const newMsgs = Array.isArray(data.messages) ? data.messages : (Array.isArray(data) ? data : []);
+      const newMsgs = Array.isArray(data.messages)
+        ? data.messages
+        : Array.isArray(data)
+        ? data
+        : [];
       setMessages((prev) => (pageNum === 1 ? newMsgs : [...newMsgs, ...prev]));
       setHasMore(data.hasMore || false);
       if (pageNum === 1) {
@@ -112,7 +188,8 @@ const SingleChat = ({ fetchagain, setFetchagain }) => {
       setPage(nextPage);
       setTimeout(() => {
         if (containerRef.current) {
-          containerRef.current.scrollTop = containerRef.current.scrollHeight - prevHeight;
+          containerRef.current.scrollTop =
+            containerRef.current.scrollHeight - prevHeight;
         }
       }, 50);
     }
@@ -138,8 +215,31 @@ const SingleChat = ({ fetchagain, setFetchagain }) => {
     }
   };
 
+  // 😂 Send emoji reaction
+  const sendEmojiReaction = (emoji) => {
+    setShowPicker(false);
+    // Apni screen pe dikhao
+    showFlyingEmoji(emoji);
+    // Dusre user ko bhejo
+    socketInstance?.emit("emoji reaction", {
+      chatId: selectedChat._id,
+      emoji,
+    });
+  };
+
   const typingHandler = (e) => {
     setNewMessage(e.target.value);
+    playClickSound();
+
+    const nextIndex = (moodIndexRef.current + 1) % MOOD_COLORS.length;
+    moodIndexRef.current = nextIndex;
+    setMoodIndex(nextIndex);
+    onMoodChange?.(MOOD_COLORS[nextIndex]);
+    socketInstance?.emit("mood change", {
+      chatId: selectedChat._id,
+      moodIndex: nextIndex,
+    });
+
     if (!typing) {
       setTyping(true);
       socketInstance?.emit("typing", selectedChat._id);
@@ -169,7 +269,7 @@ const SingleChat = ({ fetchagain, setFetchagain }) => {
       <style>{`
         @keyframes typingPulse {
           0%, 100% { opacity: 0.3; transform: translateY(0); }
-          50%       { opacity: 1;   transform: translateY(-3px); }
+          50%       { opacity: 1; transform: translateY(-3px); }
         }
         .typing-dot {
           width: 4px; height: 4px; border-radius: 50%;
@@ -177,15 +277,48 @@ const SingleChat = ({ fetchagain, setFetchagain }) => {
         }
         .sc-scroll::-webkit-scrollbar { width: 3px; }
         .sc-scroll::-webkit-scrollbar-thumb {
-          background: ${rgba(accentColor, 0.4)};
-          border-radius: 10px;
+          background: ${rgba(accentColor, 0.4)}; border-radius: 10px;
+        }
+        .msg-bubble { transition: background-color 0.4s ease, border-color 0.4s ease; }
+
+        /* 😂 Flying emoji animation */
+        @keyframes emojiFloat {
+          0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.3); }
+          20%  { opacity: 1; transform: translate(-50%, -50%) scale(1.3); }
+          60%  { opacity: 1; transform: translate(-50%, -60%) scale(1.1); }
+          100% { opacity: 0; transform: translate(-50%, -80%) scale(0.8); }
+        }
+        .flying-emoji {
+          position: fixed;
+          top: 50%; left: 50%;
+          font-size: 120px;
+          z-index: 9999;
+          pointer-events: none;
+          animation: emojiFloat 2s ease forwards;
+          filter: drop-shadow(0 0 30px rgba(255,255,255,0.3));
+        }
+
+        /* Emoji picker */
+        @keyframes pickerIn {
+          from { opacity: 0; transform: translateY(10px) scale(0.95); }
+          to   { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .emoji-picker {
+          animation: pickerIn 0.2s ease forwards;
         }
       `}</style>
+
+      {/* 😂 Full screen flying emoji */}
+      {flyingEmoji && (
+        <div key={flyingEmoji.id} className="flying-emoji">
+          {flyingEmoji.emoji}
+        </div>
+      )}
 
       {/* MESSAGES */}
       <div
         className="sc-scroll flex-1 overflow-y-auto px-5 py-6"
-        style={{ minHeight: 0, background: "#050505" }}
+        style={{ minHeight: 0, background: "transparent" }}
         ref={containerRef}
         onScroll={handleScroll}
       >
@@ -208,17 +341,15 @@ const SingleChat = ({ fetchagain, setFetchagain }) => {
             <div className="space-y-2">
               {msgs.map((m, i) => {
                 const isMine = (m.sender?._id || m.sender) === myId;
+                const bubbleColor = isMine ? accentColor : MOOD_COLORS[otherMoodIndex];
                 return (
-                  <div
-                    key={m._id || i}
-                    className={`flex ${isMine ? "justify-end" : "justify-start"}`}
-                  >
+                  <div key={m._id || i} className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
                     <div
-                      className="max-w-[82%] px-5 py-3.5 text-[14.5px] leading-relaxed transition-all duration-300"
+                      className="msg-bubble max-w-[82%] px-5 py-3.5 text-[14.5px] leading-relaxed"
                       style={{
                         borderRadius: isMine ? "24px 24px 4px 24px" : "24px 24px 24px 4px",
-                        backgroundColor: isMine ? rgba(accentColor, 0.18) : "rgba(255,255,255,0.05)",
-                        border: `1px solid ${isMine ? rgba(accentColor, 0.35) : "rgba(255,255,255,0.1)"}`,
+                        backgroundColor: rgba(bubbleColor, 0.18),
+                        border: `1px solid ${rgba(bubbleColor, 0.35)}`,
                         color: "#fff",
                       }}
                     >
@@ -232,10 +363,17 @@ const SingleChat = ({ fetchagain, setFetchagain }) => {
         ))}
 
         {isTyping && (
-          <div className="flex gap-1.5 p-3 mt-2 w-fit rounded-2xl bg-white/5 border border-white/10">
-            <div className="typing-dot" style={{ background: accentColor, animationDelay: "0s" }} />
-            <div className="typing-dot" style={{ background: accentColor, animationDelay: "0.2s" }} />
-            <div className="typing-dot" style={{ background: accentColor, animationDelay: "0.4s" }} />
+          <div
+            className="flex gap-1.5 p-3 mt-2 w-fit rounded-2xl"
+            style={{
+              background: rgba(MOOD_COLORS[otherMoodIndex], 0.1),
+              border: `1px solid ${rgba(MOOD_COLORS[otherMoodIndex], 0.2)}`,
+              transition: "all 0.4s ease",
+            }}
+          >
+            <div className="typing-dot" style={{ background: MOOD_COLORS[otherMoodIndex], animationDelay: "0s" }} />
+            <div className="typing-dot" style={{ background: MOOD_COLORS[otherMoodIndex], animationDelay: "0.2s" }} />
+            <div className="typing-dot" style={{ background: MOOD_COLORS[otherMoodIndex], animationDelay: "0.4s" }} />
           </div>
         )}
 
@@ -244,35 +382,81 @@ const SingleChat = ({ fetchagain, setFetchagain }) => {
 
       {/* FOOTER */}
       <footer
-        className="flex-shrink-0 p-5"
+        className="flex-shrink-0 p-4 relative"
         style={{
           background: "#0a0a0a",
-          borderTop: "1px solid rgba(255,255,255,0.05)",
+          borderTop: `1px solid ${rgba(accentColor, 0.15)}`,
+          transition: "border-color 0.4s ease",
         }}
       >
+        {/* 😂 Emoji Picker — 3 dots button se khulega */}
+        {showPicker && (
+          <div
+            ref={pickerRef}
+            className="emoji-picker absolute bottom-[80px] right-4 rounded-2xl p-3 z-50"
+            style={{
+              background: "#111",
+              border: `1px solid ${rgba(accentColor, 0.25)}`,
+              boxShadow: `0 8px 32px rgba(0,0,0,0.6), 0 0 20px ${rgba(accentColor, 0.1)}`,
+            }}
+          >
+            <p className="text-[9px] uppercase tracking-widest mb-2 px-1" style={{ color: rgba(accentColor, 0.6) }}>
+              React with emoji
+            </p>
+            <div className="grid grid-cols-5 gap-1">
+              {QUICK_EMOJIS.map((emoji) => (
+                <button
+                  key={emoji}
+                  onClick={() => sendEmojiReaction(emoji)}
+                  className="w-10 h-10 flex items-center justify-center rounded-xl text-2xl active:scale-90 transition-transform"
+                  style={{ background: rgba(accentColor, 0.08) }}
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div
-          className="flex items-center gap-3 pl-6 pr-2 py-2 rounded-[28px]"
+          className="flex items-center gap-2 pl-5 pr-2 py-2 rounded-[28px]"
           style={{
-            background: "rgba(255,255,255,0.03)",
+            background: rgba(accentColor, 0.06),
             border: `1px solid ${rgba(accentColor, 0.2)}`,
+            transition: "all 0.4s ease",
           }}
         >
+          {/* 😂 3-dots emoji button */}
+          <button
+            onClick={() => setShowPicker((p) => !p)}
+            className="flex-shrink-0 w-9 h-9 flex items-center justify-center rounded-xl active:scale-90 transition-all"
+            style={{
+              background: showPicker ? rgba(accentColor, 0.2) : rgba(accentColor, 0.08),
+              color: accentColor,
+              transition: "all 0.3s ease",
+            }}
+          >
+            <span style={{ fontSize: "18px", letterSpacing: "-2px", lineHeight: 1 }}>•••</span>
+          </button>
+
           <input
             value={newMessage}
             onChange={typingHandler}
             onKeyDown={sendMessage}
             onFocus={() => setTimeout(scrollToBottom, 150)}
-            placeholder="Write a message..."
+            placeholder="Type to vibe..."
             className="flex-1 bg-transparent outline-none text-white py-2"
             style={{ fontSize: "16px" }}
           />
+
           <button
             onClick={sendMessage}
-            className="w-11 h-11 flex items-center justify-center rounded-full active:scale-90 transition-all duration-300"
+            className="w-11 h-11 flex items-center justify-center rounded-full active:scale-90 transition-all flex-shrink-0"
             style={{
               backgroundColor: accentColor,
               color: "#000",
-              boxShadow: `0 0 15px ${rgba(accentColor, 0.3)}`,
+              boxShadow: `0 0 12px ${rgba(accentColor, 0.4)}`,
+              transition: "background-color 0.4s ease, box-shadow 0.4s ease",
             }}
           >
             ➤
