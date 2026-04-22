@@ -12,10 +12,11 @@ const MOOD_COLORS = [
   "#3b82f6", "#a855f7",
 ];
 
+// ✅ Extended Emoji List (30 Emojis)
 const QUICK_EMOJIS = [
-  "😂", "❤️", "🔥", "😍", "🥹",
-  "💀", "🤯", "😎", "🥰", "👑",
-  "💯", "🚀", "✨", "🫶", "😭",
+  "😂", "❤️", "🔥", "😍", "🥹", "💀", "🤯", "😎", "🥰", "👑",
+  "💯", "🚀", "✨", "🫶", "😭", "🙏", "👀", "🤫", "🥳", "😤",
+  "🤡", "🤮", "🥵", "🥶", "🧿", "🤝", "⚡", "🌈", "🎈", "💎"
 ];
 
 const playClickSound = () => {
@@ -51,11 +52,8 @@ const SingleChat = ({ fetchagain, setFetchagain, onMoodChange }) => {
   const [showPicker, setShowPicker] = useState(false);
   const [flyingEmoji, setFlyingEmoji] = useState(null);
 
-  // 🗑️ Delete menu — state mein sirf messageId store
   const [activeMenu, setActiveMenu] = useState(null);
-  // Ref use karo timer ke liye — state se re-render issue hota tha
   const longPressTimerRef = useRef(null);
-  // Track karo ki long press hua ya normal tap
   const isLongPressRef = useRef(false);
 
   const messagesEndRef = useRef(null);
@@ -91,7 +89,6 @@ const SingleChat = ({ fetchagain, setFetchagain, onMoodChange }) => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  // Close picker on outside click
   useEffect(() => {
     const handler = (e) => {
       if (pickerRef.current && !pickerRef.current.contains(e.target)) {
@@ -162,17 +159,12 @@ const SingleChat = ({ fetchagain, setFetchagain, onMoodChange }) => {
         `/api/allmessages/${selectedChat._id}?page=${pageNum}`,
         getAuthHeader()
       );
-      const newMsgs = Array.isArray(data.messages)
-        ? data.messages
-        : Array.isArray(data)
-        ? data
-        : [];
+      const newMsgs = Array.isArray(data.messages) ? data.messages : (Array.isArray(data) ? data : []);
       setMessages((prev) => (pageNum === 1 ? newMsgs : [...newMsgs, ...prev]));
       setHasMore(data.hasMore || false);
       if (pageNum === 1) {
         socketInstance?.emit("join chat", selectedChat._id);
         setTimeout(scrollToBottom, 200);
-        // ✅ Last emoji message pe flying animation dikha do
         const lastEmoji = [...newMsgs].reverse().find((m) => m.isEmoji);
         if (lastEmoji) {
           setTimeout(() => showFlyingEmoji(lastEmoji.content), 400);
@@ -203,8 +195,7 @@ const SingleChat = ({ fetchagain, setFetchagain, onMoodChange }) => {
       setPage(nextPage);
       setTimeout(() => {
         if (containerRef.current) {
-          containerRef.current.scrollTop =
-            containerRef.current.scrollHeight - prevHeight;
+          containerRef.current.scrollTop = containerRef.current.scrollHeight - prevHeight;
         }
       }, 50);
     }
@@ -245,10 +236,7 @@ const SingleChat = ({ fetchagain, setFetchagain, onMoodChange }) => {
               : m
           )
         );
-        socketInstance?.emit("message deleted", {
-          messageId,
-          chatId: selectedChat._id,
-        });
+        socketInstance?.emit("message deleted", { messageId, chatId: selectedChat._id });
       } else {
         setMessages((prev) => prev.filter((m) => m._id !== messageId));
       }
@@ -259,23 +247,16 @@ const SingleChat = ({ fetchagain, setFetchagain, onMoodChange }) => {
 
   const sendEmojiReaction = async (emoji) => {
     setShowPicker(false);
-    // Apni screen pe turant dikhao
     showFlyingEmoji(emoji);
     try {
-      // DB mein save karo
       const { data } = await API.post(
         "/api/sendemoji",
         { chatid: selectedChat._id, emoji },
         getAuthHeader()
       );
-      // Message list mein add karo (isEmoji: true)
       setMessages((prev) => [...prev, data]);
-      // Socket se dusre user ko bhejo — woh online ho toh turant dikhe
       socketInstance?.emit("new message", data);
-      socketInstance?.emit("emoji reaction", {
-        chatId: selectedChat._id,
-        emoji,
-      });
+      socketInstance?.emit("emoji reaction", { chatId: selectedChat._id, emoji });
     } catch (err) {
       console.error("Emoji send error:", err);
     }
@@ -288,10 +269,7 @@ const SingleChat = ({ fetchagain, setFetchagain, onMoodChange }) => {
     moodIndexRef.current = nextIndex;
     setMoodIndex(nextIndex);
     onMoodChange?.(MOOD_COLORS[nextIndex]);
-    socketInstance?.emit("mood change", {
-      chatId: selectedChat._id,
-      moodIndex: nextIndex,
-    });
+    socketInstance?.emit("mood change", { chatId: selectedChat._id, moodIndex: nextIndex });
     if (!typing) {
       setTyping(true);
       socketInstance?.emit("typing", selectedChat._id);
@@ -305,25 +283,27 @@ const SingleChat = ({ fetchagain, setFetchagain, onMoodChange }) => {
     }, 3000);
   };
 
-  // ✅ Long press handlers — ref use kar rahe hain timer ke liye
+  // ✅ MOBILE FIX: Better Long Press Logic
   const handleTouchStart = (msgId) => {
     isLongPressRef.current = false;
     longPressTimerRef.current = setTimeout(() => {
       isLongPressRef.current = true;
       setActiveMenu(msgId);
-    }, 500);
+      if (window.navigator.vibrate) window.navigator.vibrate(50); // Haptic feedback
+    }, 600); // 600ms long press
   };
 
   const handleTouchEnd = (e) => {
     clearTimeout(longPressTimerRef.current);
-    // Agar long press hua toh scroll/tap prevent karo
+    // Agar menu khul gaya hai toh tap action prevent karo
     if (isLongPressRef.current) {
       e.preventDefault();
+      e.stopPropagation();
     }
   };
 
   const handleTouchMove = () => {
-    // Scroll karne par long press cancel ho
+    // Agar user scroll kar raha hai toh long press cancel
     clearTimeout(longPressTimerRef.current);
     isLongPressRef.current = false;
   };
@@ -356,10 +336,9 @@ const SingleChat = ({ fetchagain, setFetchagain, onMoodChange }) => {
         }
         .msg-bubble {
           transition: background-color 0.4s ease, border-color 0.4s ease;
-          -webkit-user-select: none;
-          user-select: none;
+          -webkit-user-select: none; user-select: none;
+          touch-action: manipulation;
         }
-        /* Emoji message — pop in animation */
         @keyframes emojiMsgPop {
           0%   { transform: scale(0.3); opacity: 0; }
           70%  { transform: scale(1.2); opacity: 1; }
@@ -367,16 +346,13 @@ const SingleChat = ({ fetchagain, setFetchagain, onMoodChange }) => {
         }
         .emoji-msg-bubble {
           animation: emojiMsgPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-          -webkit-user-select: none;
-          user-select: none;
         }
-        /* Delete menu animation */
         @keyframes menuIn {
-          from { opacity: 0; transform: scale(0.9) translateY(6px); }
+          from { opacity: 0; transform: scale(0.9) translateY(10px); }
           to   { opacity: 1; transform: scale(1) translateY(0); }
         }
         .delete-menu {
-          animation: menuIn 0.15s ease forwards;
+          animation: menuIn 0.15s cubic-bezier(0.2, 0, 0.2, 1) forwards;
         }
         @keyframes emojiFloat {
           0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.3); }
@@ -385,57 +361,34 @@ const SingleChat = ({ fetchagain, setFetchagain, onMoodChange }) => {
           100% { opacity: 0; transform: translate(-50%, -80%) scale(0.8); }
         }
         .flying-emoji {
-          position: fixed;
-          top: 50%; left: 50%;
-          font-size: 120px;
-          z-index: 9999;
-          pointer-events: none;
+          position: fixed; top: 50%; left: 50%; font-size: 120px;
+          z-index: 9999; pointer-events: none;
           animation: emojiFloat 2s ease forwards;
           filter: drop-shadow(0 0 30px rgba(255,255,255,0.3));
         }
-        @keyframes pickerIn {
-          from { opacity: 0; transform: translateY(10px) scale(0.95); }
-          to   { opacity: 1; transform: translateY(0) scale(1); }
+        .emoji-picker-container {
+          max-height: 250px; overflow-y: auto;
         }
-        .emoji-picker { animation: pickerIn 0.2s ease forwards; }
+        .emoji-picker-container::-webkit-scrollbar { width: 0; }
       `}</style>
 
       {flyingEmoji && (
-        <div key={flyingEmoji.id} className="flying-emoji">
-          {flyingEmoji.emoji}
-        </div>
+        <div key={flyingEmoji.id} className="flying-emoji">{flyingEmoji.emoji}</div>
       )}
 
-      {/* Backdrop — activeMenu ho toh bahar tap se close ho */}
       {activeMenu && (
-        <div
-          className="fixed inset-0 z-40"
-          onTouchStart={() => setActiveMenu(null)}
-          onClick={() => setActiveMenu(null)}
-        />
+        <div className="fixed inset-0 z-40" onClick={() => setActiveMenu(null)} onTouchStart={() => setActiveMenu(null)} />
       )}
 
-      {/* MESSAGES */}
-      <div
-        className="sc-scroll flex-1 overflow-y-auto px-4 py-6"
-        style={{ minHeight: 0, background: "transparent" }}
-        ref={containerRef}
-        onScroll={handleScroll}
-      >
-        {loadingMore && (
-          <div className="text-center text-[10px] py-2" style={{ color: "rgba(255,255,255,0.3)" }}>
-            Loading older messages...
-          </div>
-        )}
+      <div className="sc-scroll flex-1 overflow-y-auto px-4 py-6" style={{ minHeight: 0, background: "transparent" }} ref={containerRef} onScroll={handleScroll}>
+        {loadingMore && <div className="text-center text-[10px] py-2 text-white/30">Loading older messages...</div>}
 
         {Object.entries(groupedMessages).map(([date, msgs]) => (
           <div key={date}>
             <div className="flex items-center gap-4 my-6">
-              <div className="flex-1 h-px" style={{ background: "rgba(255,255,255,0.05)" }} />
-              <span className="text-[9px] font-bold uppercase tracking-[2px]" style={{ color: "rgba(255,255,255,0.2)" }}>
-                {date}
-              </span>
-              <div className="flex-1 h-px" style={{ background: "rgba(255,255,255,0.05)" }} />
+              <div className="flex-1 h-px bg-white/5" />
+              <span className="text-[9px] font-bold uppercase tracking-[2px] text-white/20">{date}</span>
+              <div className="flex-1 h-px bg-white/5" />
             </div>
 
             <div className="space-y-2">
@@ -444,94 +397,52 @@ const SingleChat = ({ fetchagain, setFetchagain, onMoodChange }) => {
                 const isDeleted = m.deletedForEveryone;
                 const isEmoji = m.isEmoji;
 
-                // Emoji message — animated bubble, no delete menu
                 if (isEmoji) {
                   return (
-                    <div
-                      key={m._id || i}
-                      className={`flex ${isMine ? "justify-end" : "justify-start"} emoji-msg-wrapper`}
-                    >
-                      <div
-                        className="emoji-msg-bubble"
-                        style={{ fontSize: "52px", lineHeight: 1, padding: "4px 8px" }}
-                      >
-                        {m.content}
-                      </div>
+                    <div key={m._id || i} className={`flex ${isMine ? "justify-end" : "justify-start"} mb-2`}>
+                      <div className="emoji-msg-bubble" style={{ fontSize: "52px", lineHeight: 1 }}>{m.content}</div>
                     </div>
                   );
                 }
 
                 return (
-                  <div
-                    key={m._id || i}
-                    className={`flex ${isMine ? "justify-end" : "justify-start"}`}
-                  >
-                    {/* 
-                      Wrapper — relative position taaki menu sahi jagah aaye
-                      inline-flex taaki wrapper sirf bubble jitna wide ho
-                    */}
-                    <div
-                      className="relative"
+                  <div key={m._id || i} className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
+                    <div 
+                      className="relative" 
                       style={{ display: "inline-flex", maxWidth: "82%" }}
                       onContextMenu={(e) => { e.preventDefault(); setActiveMenu(m._id); }}
                       onTouchStart={() => handleTouchStart(m._id)}
                       onTouchEnd={handleTouchEnd}
                       onTouchMove={handleTouchMove}
                     >
-                      {/* Delete menu */}
                       {activeMenu === m._id && !isDeleted && (
-                        <div
-                          className="delete-menu absolute z-50 rounded-2xl overflow-hidden shadow-2xl"
+                        <div 
+                          className="delete-menu absolute z-50 rounded-2xl overflow-hidden"
                           style={{
-                            background: "#1a1a1a",
-                            border: `1px solid ${rgba(accentColor, 0.3)}`,
-                            boxShadow: `0 8px 32px rgba(0,0,0,0.8), 0 0 20px ${rgba(accentColor, 0.1)}`,
-                            // Menu ko bubble ke upar dikhao
-                            bottom: "calc(100% + 8px)",
-                            // Sender ke liye right align, receiver ke liye left
-                            ...(isMine ? { right: 0 } : { left: 0 }),
-                            minWidth: "200px",
+                            background: "#161616", border: `1px solid ${rgba(accentColor, 0.3)}`,
+                            bottom: "calc(100% + 8px)", ...(isMine ? { right: 0 } : { left: 0 }),
+                            minWidth: "180px", boxShadow: "0 10px 40px rgba(0,0,0,0.7)"
                           }}
                         >
                           {isMine && (
-                            <button
-                              onTouchStart={(e) => e.stopPropagation()}
-                              onClick={() => handleDelete(m._id, true)}
-                              className="flex items-center gap-3 px-5 py-3.5 text-[13px] text-red-400 font-bold w-full text-left active:bg-red-500/10"
-                              style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}
-                            >
+                            <button onClick={() => handleDelete(m._id, true)} className="flex items-center gap-3 px-5 py-3.5 text-[13px] text-red-400 font-bold w-full text-left active:bg-red-500/10 border-b border-white/5">
                               🗑️ Delete for Everyone
                             </button>
                           )}
-                          <button
-                            onTouchStart={(e) => e.stopPropagation()}
-                            onClick={() => handleDelete(m._id, false)}
-                            className="flex items-center gap-3 px-5 py-3.5 text-[13px] text-white/70 w-full text-left active:bg-white/5"
-                          >
+                          <button onClick={() => handleDelete(m._id, false)} className="flex items-center gap-3 px-5 py-3.5 text-[13px] text-white/70 w-full text-left active:bg-white/5">
                             🙈 Delete for Me
                           </button>
                         </div>
                       )}
 
-                      {/* Message bubble */}
-                      <div
+                      <div 
                         className="msg-bubble px-5 py-3.5 text-[14.5px] leading-relaxed"
                         style={{
                           borderRadius: isMine ? "20px 20px 4px 20px" : "20px 20px 20px 4px",
-                          backgroundColor: isDeleted
-                            ? "rgba(255,255,255,0.03)"
-                            : isMine
-                            ? rgba(accentColor, 0.2)
-                            : "rgba(255,255,255,0.08)",
-                          border: `1px solid ${
-                            isDeleted
-                              ? "rgba(255,255,255,0.06)"
-                              : isMine
-                              ? rgba(accentColor, 0.4)
-                              : "rgba(255,255,255,0.12)"
-                          }`,
+                          backgroundColor: isDeleted ? "rgba(255,255,255,0.03)" : isMine ? rgba(accentColor, 0.2) : "rgba(255,255,255,0.08)",
+                          border: `1px solid ${isDeleted ? "rgba(255,255,255,0.06)" : isMine ? rgba(accentColor, 0.4) : "rgba(255,255,255,0.12)"}`,
                           color: isDeleted ? "rgba(255,255,255,0.3)" : "#fff",
-                          fontStyle: isDeleted ? "italic" : "normal",
+                          fontStyle: isDeleted ? "italic" : "normal"
                         }}
                       >
                         {m.content}
@@ -543,55 +454,23 @@ const SingleChat = ({ fetchagain, setFetchagain, onMoodChange }) => {
             </div>
           </div>
         ))}
-
         {isTyping && (
-          <div
-            className="flex gap-1.5 p-3 mt-2 w-fit rounded-2xl"
-            style={{
-              background: rgba(MOOD_COLORS[otherMoodIndex], 0.1),
-              border: `1px solid ${rgba(MOOD_COLORS[otherMoodIndex], 0.2)}`,
-              transition: "all 0.4s ease",
-            }}
-          >
+          <div className="flex gap-1.5 p-3 mt-2 w-fit rounded-2xl" style={{ background: rgba(MOOD_COLORS[otherMoodIndex], 0.1), border: `1px solid ${rgba(MOOD_COLORS[otherMoodIndex], 0.2)}` }}>
             <div className="typing-dot" style={{ background: MOOD_COLORS[otherMoodIndex], animationDelay: "0s" }} />
             <div className="typing-dot" style={{ background: MOOD_COLORS[otherMoodIndex], animationDelay: "0.2s" }} />
             <div className="typing-dot" style={{ background: MOOD_COLORS[otherMoodIndex], animationDelay: "0.4s" }} />
           </div>
         )}
-
         <div ref={messagesEndRef} />
       </div>
 
-      {/* FOOTER */}
-      <footer
-        className="flex-shrink-0 p-4 relative"
-        style={{
-          background: "#0a0a0a",
-          borderTop: `1px solid ${rgba(accentColor, 0.15)}`,
-          transition: "border-color 0.4s ease",
-        }}
-      >
+      <footer className="flex-shrink-0 p-4 relative" style={{ background: "#0a0a0a", borderTop: `1px solid ${rgba(accentColor, 0.15)}` }}>
         {showPicker && (
-          <div
-            ref={pickerRef}
-            className="emoji-picker absolute bottom-[80px] right-4 rounded-2xl p-3 z-50"
-            style={{
-              background: "#111",
-              border: `1px solid ${rgba(accentColor, 0.25)}`,
-              boxShadow: `0 8px 32px rgba(0,0,0,0.6), 0 0 20px ${rgba(accentColor, 0.1)}`,
-            }}
-          >
-            <p className="text-[9px] uppercase tracking-widest mb-2 px-1" style={{ color: rgba(accentColor, 0.6) }}>
-              React with emoji
-            </p>
-            <div className="grid grid-cols-5 gap-1">
+          <div ref={pickerRef} className="emoji-picker absolute bottom-[85px] right-4 rounded-2xl p-3 z-50 w-[280px]" style={{ background: "#111", border: `1px solid ${rgba(accentColor, 0.25)}`, boxShadow: "0 10px 40px rgba(0,0,0,0.6)" }}>
+            <p className="text-[9px] uppercase tracking-widest mb-3 px-1" style={{ color: rgba(accentColor, 0.6) }}>Select Emoji</p>
+            <div className="emoji-picker-container grid grid-cols-5 gap-2">
               {QUICK_EMOJIS.map((emoji) => (
-                <button
-                  key={emoji}
-                  onClick={() => sendEmojiReaction(emoji)}
-                  className="w-10 h-10 flex items-center justify-center rounded-xl text-2xl active:scale-90 transition-transform"
-                  style={{ background: rgba(accentColor, 0.08) }}
-                >
+                <button key={emoji} onClick={() => sendEmojiReaction(emoji)} className="w-11 h-11 flex items-center justify-center rounded-xl text-2xl active:scale-75 transition-transform" style={{ background: rgba(accentColor, 0.08) }}>
                   {emoji}
                 </button>
               ))}
@@ -599,47 +478,12 @@ const SingleChat = ({ fetchagain, setFetchagain, onMoodChange }) => {
           </div>
         )}
 
-        <div
-          className="flex items-center gap-2 pl-5 pr-2 py-2 rounded-[28px]"
-          style={{
-            background: rgba(accentColor, 0.06),
-            border: `1px solid ${rgba(accentColor, 0.2)}`,
-            transition: "all 0.4s ease",
-          }}
-        >
-          <button
-            onClick={() => setShowPicker((p) => !p)}
-            className="flex-shrink-0 w-9 h-9 flex items-center justify-center rounded-xl active:scale-90 transition-all"
-            style={{
-              background: showPicker ? rgba(accentColor, 0.2) : rgba(accentColor, 0.08),
-              color: accentColor,
-            }}
-          >
-            <span style={{ fontSize: "18px", letterSpacing: "-2px", lineHeight: 1 }}>•••</span>
+        <div className="flex items-center gap-2 pl-5 pr-2 py-2 rounded-[28px]" style={{ background: rgba(accentColor, 0.06), border: `1px solid ${rgba(accentColor, 0.2)}` }}>
+          <button onClick={() => setShowPicker(!showPicker)} className="w-9 h-9 flex items-center justify-center rounded-xl active:scale-90" style={{ background: showPicker ? rgba(accentColor, 0.2) : "transparent", color: accentColor }}>
+             <span style={{ fontSize: "18px", letterSpacing: "-1px" }}>•••</span>
           </button>
-
-          <input
-            value={newMessage}
-            onChange={typingHandler}
-            onKeyDown={sendMessage}
-            onFocus={() => setTimeout(scrollToBottom, 150)}
-            placeholder="Type to vibe..."
-            className="flex-1 bg-transparent outline-none text-white py-2"
-            style={{ fontSize: "16px" }}
-          />
-
-          <button
-            onClick={sendMessage}
-            className="w-11 h-11 flex items-center justify-center rounded-full active:scale-90 transition-all flex-shrink-0"
-            style={{
-              backgroundColor: accentColor,
-              color: "#000",
-              boxShadow: `0 0 12px ${rgba(accentColor, 0.4)}`,
-              transition: "background-color 0.4s ease, box-shadow 0.4s ease",
-            }}
-          >
-            ➤
-          </button>
+          <input value={newMessage} onChange={typingHandler} onKeyDown={sendMessage} onFocus={() => setTimeout(scrollToBottom, 150)} placeholder="Type to vibe..." className="flex-1 bg-transparent outline-none text-white py-2" style={{ fontSize: "16px" }} />
+          <button onClick={sendMessage} className="w-11 h-11 flex items-center justify-center rounded-full active:scale-90" style={{ backgroundColor: accentColor, color: "#000", boxShadow: `0 0 12px ${rgba(accentColor, 0.4)}` }}>➤</button>
         </div>
       </footer>
     </>
