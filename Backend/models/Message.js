@@ -31,6 +31,11 @@ const messageSchema = new mongoose.Schema({
     deletedForEveryone: {
         type: Boolean,
         default: false
+    },
+    // ✅ Emoji reaction — DB mein save hoga
+    isEmoji: {
+        type: Boolean,
+        default: false
     }
 }, {
     timestamps: true

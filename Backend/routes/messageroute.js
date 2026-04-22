@@ -1,14 +1,12 @@
 import express from "express"
-import { allmessages, sendMessage,deleteMessage } from "../controller/Messagecontroller.js"
+import { allmessages, sendMessage, deleteMessage, sendEmojiReaction } from "../controller/Messagecontroller.js"
 import { auth } from "../middlewares/authmiddleware.js"
 
+const router = express.Router()
 
-
-
-const router=express.Router()
-
-router.post('/sendmessage',auth,sendMessage);
-router.get('/allmessages/:chatid',auth,allmessages)
+router.post('/sendmessage', auth, sendMessage);
+router.get('/allmessages/:chatid', auth, allmessages);
 router.delete("/deletemessage/:messageId", auth, deleteMessage);
+router.post("/sendemoji", auth, sendEmojiReaction);  // ✅ Emoji route
 
 export default router;

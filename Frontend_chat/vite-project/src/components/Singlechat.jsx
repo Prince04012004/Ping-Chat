@@ -172,6 +172,11 @@ const SingleChat = ({ fetchagain, setFetchagain, onMoodChange }) => {
       if (pageNum === 1) {
         socketInstance?.emit("join chat", selectedChat._id);
         setTimeout(scrollToBottom, 200);
+        // ✅ Last emoji message pe flying animation dikha do
+        const lastEmoji = [...newMsgs].reverse().find((m) => m.isEmoji);
+        if (lastEmoji) {
+          setTimeout(() => showFlyingEmoji(lastEmoji.content), 400);
+        }
       }
     } catch (err) {
       console.error("Fetch error:", err);
@@ -252,13 +257,28 @@ const SingleChat = ({ fetchagain, setFetchagain, onMoodChange }) => {
     }
   };
 
-  const sendEmojiReaction = (emoji) => {
+  const sendEmojiReaction = async (emoji) => {
     setShowPicker(false);
+    // Apni screen pe turant dikhao
     showFlyingEmoji(emoji);
-    socketInstance?.emit("emoji reaction", {
-      chatId: selectedChat._id,
-      emoji,
-    });
+    try {
+      // DB mein save karo
+      const { data } = await API.post(
+        "/api/sendemoji",
+        { chatid: selectedChat._id, emoji },
+        getAuthHeader()
+      );
+      // Message list mein add karo (isEmoji: true)
+      setMessages((prev) => [...prev, data]);
+      // Socket se dusre user ko bhejo — woh online ho toh turant dikhe
+      socketInstance?.emit("new message", data);
+      socketInstance?.emit("emoji reaction", {
+        chatId: selectedChat._id,
+        emoji,
+      });
+    } catch (err) {
+      console.error("Emoji send error:", err);
+    }
   };
 
   const typingHandler = (e) => {
@@ -336,7 +356,17 @@ const SingleChat = ({ fetchagain, setFetchagain, onMoodChange }) => {
         }
         .msg-bubble {
           transition: background-color 0.4s ease, border-color 0.4s ease;
-          /* Long press pe text select band karo mobile pe */
+          -webkit-user-select: none;
+          user-select: none;
+        }
+        /* Emoji message — pop in animation */
+        @keyframes emojiMsgPop {
+          0%   { transform: scale(0.3); opacity: 0; }
+          70%  { transform: scale(1.2); opacity: 1; }
+          100% { transform: scale(1);   opacity: 1; }
+        }
+        .emoji-msg-bubble {
+          animation: emojiMsgPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
           -webkit-user-select: none;
           user-select: none;
         }
@@ -412,6 +442,24 @@ const SingleChat = ({ fetchagain, setFetchagain, onMoodChange }) => {
               {msgs.map((m, i) => {
                 const isMine = (m.sender?._id || m.sender) === myId;
                 const isDeleted = m.deletedForEveryone;
+                const isEmoji = m.isEmoji;
+
+                // Emoji message — animated bubble, no delete menu
+                if (isEmoji) {
+                  return (
+                    <div
+                      key={m._id || i}
+                      className={`flex ${isMine ? "justify-end" : "justify-start"} emoji-msg-wrapper`}
+                    >
+                      <div
+                        className="emoji-msg-bubble"
+                        style={{ fontSize: "52px", lineHeight: 1, padding: "4px 8px" }}
+                      >
+                        {m.content}
+                      </div>
+                    </div>
+                  );
+                }
 
                 return (
                   <div

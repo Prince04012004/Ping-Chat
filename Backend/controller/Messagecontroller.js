@@ -42,8 +42,8 @@ export const allmessages = async (req, res) => {
 
         const messages = await Message.find({
             chat: chatid,
-            deletedForEveryone: { $ne: true },       // "delete for everyone" wale hide
-            deletedFor: { $nin: [req.user._id] }      // "delete for me" wale hide
+            deletedForEveryone: { $ne: true },
+            deletedFor: { $nin: [req.user._id] }
         })
             .populate("sender", "name profilepic email")
             .populate("chat")
@@ -70,25 +70,52 @@ export const allmessages = async (req, res) => {
     }
 };
 
-// ✅ Delete message
+// ✅ Send emoji reaction — DB mein save hoga
+export const sendEmojiReaction = async (req, res) => {
+    const { chatid, emoji } = req.body;
+
+    if (!chatid || !emoji) {
+        return res.status(400).json({ message: "Chat id and emoji required" });
+    }
+
+    try {
+        var message = await Message.create({
+            sender: req.user._id,
+            content: emoji,
+            chat: chatid,
+            isEmoji: true   // Special flag — yeh emoji reaction hai
+        });
+
+        message = await message.populate("sender", "name profilepic");
+        message = await message.populate("chat");
+        message = await User.populate(message, {
+            path: "chat.users",
+            select: "name profilepic phonenumber"
+        });
+
+        res.json(message);
+    } catch (err) {
+        res.status(400).json({ message: err.message });
+    }
+};
+
+// Delete message
 export const deleteMessage = async (req, res) => {
     try {
         const { messageId } = req.params;
-        const { deleteForEveryone } = req.body; // true = dono ke liye, false = sirf apne liye
+        const { deleteForEveryone } = req.body;
         const userId = req.user._id;
 
         const message = await Message.findById(messageId);
         if (!message) return res.status(404).json({ message: "Message not found" });
 
         if (deleteForEveryone) {
-            // Sirf sender delete for everyone kar sakta hai
             if (message.sender.toString() !== userId.toString()) {
                 return res.status(403).json({ message: "Only sender can delete for everyone" });
             }
             message.deletedForEveryone = true;
             message.content = "This message was deleted";
         } else {
-            // Delete for me — sirf apne liye
             if (!message.deletedFor.includes(userId)) {
                 message.deletedFor.push(userId);
             }
