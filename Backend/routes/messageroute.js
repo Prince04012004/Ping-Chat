@@ -1,5 +1,5 @@
 import express from "express"
-import { allmessages, sendMessage } from "../controller/Messagecontroller.js"
+import { allmessages, sendMessage,deleteMessage } from "../controller/Messagecontroller.js"
 import { auth } from "../middlewares/authmiddleware.js"
 
 
