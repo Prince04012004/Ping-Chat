@@ -15,8 +15,8 @@ export const accessChat = async (req, res) => {
 
     if (!otherUser) return res.status(404).json({ message: "User not found" });
 
-    const iBlockedThem = currentUser.blockedList?.map(id => id.toString()).includes(userId.toString());
-    const theyBlockedMe = otherUser.blockedList?.map(id => id.toString()).includes(req.user._id.toString());
+    const iBlockedThem = currentUser.blockedusers?.map(id => id.toString()).includes(userId.toString());
+    const theyBlockedMe = otherUser.blockedusers?.map(id => id.toString()).includes(req.user._id.toString());
 
     if (iBlockedThem) {
       return res.status(403).json({
