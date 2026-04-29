@@ -2,27 +2,73 @@ import User from "../models/User.js";
 import Chat from "../models/Chat.js";
 
 
-export const accessChat = async (userId) => {
+import User from "../models/User.js";
+import Chat from "../models/Chat.js";
+
+export const accessChat = async (req, res) => {
+  const { userId } = req.body;
+
+  if (!userId) return res.sendStatus(400);
+
   try {
-    setLoading(true);
-    const token = user?.token || localStorage.getItem("token");
-    const { data } = await API.post(`/api/accesschat`, { userId },
-      { headers: { "Content-type": "application/json", Authorization: `Bearer ${token}` } });
-    
-    setChats((prev) => prev.find((c) => c._id === data._id) ? prev : [data, ...prev]);
-    setSelectedChat(data);
-    setSearch("");
-    setSearchResults([]);
-  } catch (error) {
-    // ✅ Block error handle karo
-    if (error.response?.status === 403) {
-      const msg = error.response.data?.blockedBy === "me"
-        ? "You have blocked this user. Unblock to chat."
-        : "You are blocked by this user.";
-      alert(msg);
+    // ✅ Block check — dono taraf se
+    const currentUser = await User.findById(req.user._id);
+    const otherUser = await User.findById(userId);
+
+    if (!otherUser) return res.status(404).json({ message: "User not found" });
+
+    const iBlockedThem = currentUser.blockedList?.map(id => id.toString()).includes(userId.toString());
+    const theyBlockedMe = otherUser.blockedList?.map(id => id.toString()).includes(req.user._id.toString());
+
+    if (iBlockedThem) {
+      return res.status(403).json({
+        message: "You have blocked this user. Unblock to chat.",
+        blocked: true,
+        blockedBy: "me"
+      });
     }
-  } finally {
-    setLoading(false);
+
+    if (theyBlockedMe) {
+      return res.status(403).json({
+        message: "You are blocked by this user.",
+        blocked: true,
+        blockedBy: "them"
+      });
+    }
+
+    // Normal chat access
+    var isChat = await Chat.find({
+      isGroupChat: false,
+      $and: [
+        { users: { $elemMatch: { $eq: req.user._id } } },
+        { users: { $elemMatch: { $eq: userId } } },
+      ],
+    })
+      .populate("users", "-password")
+      .populate("lastmessage");
+
+    isChat = await User.populate(isChat, {
+      path: "lastmessage.sender",
+      select: "name profilepic email",
+    });
+
+    if (isChat.length > 0) {
+      res.send(isChat[0]);
+    } else {
+      var chatData = {
+        chatName: "sender",
+        isGroupChat: false,
+        users: [req.user._id, userId],
+      };
+
+      const createdChat = await Chat.create(chatData);
+      const FullChat = await Chat.findOne({ _id: createdChat._id }).populate(
+        "users", "-password"
+      );
+      res.status(200).json(FullChat);
+    }
+  } catch (error) {
+    res.status(400).send(error.message);
   }
 };
 
