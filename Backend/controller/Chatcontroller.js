@@ -1,44 +1,28 @@
 import User from "../models/User.js";
 import Chat from "../models/Chat.js";
-export const accessChat = async (req, res) => {
-  const { userId } = req.body;
 
-  if (!userId) return res.sendStatus(400);
 
-  var isChat = await Chat.find({
-    isGroupChat: false,
-    $and: [
-      { users: { $elemMatch: { $eq: req.user._id } } },
-      { users: { $elemMatch: { $eq: userId } } },
-    ],
-  })
-    .populate("users", "-password")
-    .populate("lastmessage");
-
-  isChat = await User.populate(isChat, {
-    path: "lastmessage.sender",
-    select: "name profilepic email",
-  });
-
-  if (isChat.length > 0) {
-    res.send(isChat[0]);
-  } else {
-    var chatData = {
-      chatName: "sender",
-      isGroupChat: false,
-      users: [req.user._id, userId],
-    };
-
-    try {
-      const createdChat = await Chat.create(chatData);
-      const FullChat = await Chat.findOne({ _id: createdChat._id }).populate(
-        "users",
-        "-password"
-      );
-      res.status(200).json(FullChat);
-    } catch (error) {
-      res.status(400).send(error.message);
+const accessChat = async (userId) => {
+  try {
+    setLoading(true);
+    const token = user?.token || localStorage.getItem("token");
+    const { data } = await API.post(`/api/accesschat`, { userId },
+      { headers: { "Content-type": "application/json", Authorization: `Bearer ${token}` } });
+    
+    setChats((prev) => prev.find((c) => c._id === data._id) ? prev : [data, ...prev]);
+    setSelectedChat(data);
+    setSearch("");
+    setSearchResults([]);
+  } catch (error) {
+    // ✅ Block error handle karo
+    if (error.response?.status === 403) {
+      const msg = error.response.data?.blockedBy === "me"
+        ? "You have blocked this user. Unblock to chat."
+        : "You are blocked by this user.";
+      alert(msg);
     }
+  } finally {
+    setLoading(false);
   }
 };
 

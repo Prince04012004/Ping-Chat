@@ -1,0 +1,8 @@
+{
+  "appId": "com.ping.app",
+  "appName": "Ping",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  }
+}
