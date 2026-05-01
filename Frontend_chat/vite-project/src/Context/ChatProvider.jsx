@@ -1,19 +1,22 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import io from "socket.io-client";
 
 const ChatContext = createContext();
+const ENDPOINT = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
+
+// ✅ Global socket — dono MyChats aur SingleChat use karenge
+export let globalSocket = null;
 
 const ChatProvider = ({ children }) => {
   const [user, setUser] = useState();
   const [selectedChat, setSelectedChat] = useState();
   const [chats, setChats] = useState([]);
-  
-  // 🔥 1. NOTIFICATION STATE (Added with initial empty array)
-  const [notification, setNotification] = useState([]); 
-  
+  const [notification, setNotification] = useState([]);
+  const [navigate_] = useState(null);
+
   const navigate = useNavigate();
 
-  // --- 2. THEME & CONFIG STATE ---
   const [theme, setTheme] = useState(localStorage.getItem("app-theme") || "default");
   const [config, setConfig] = useState(() => {
     const savedConfig = localStorage.getItem("user-config");
@@ -25,14 +28,12 @@ const ChatProvider = ({ children }) => {
     };
   });
 
-  // --- 3. ASSET ENGINE ---
   const [assets, setAssets] = useState({
-    character: "", 
+    character: "",
     bgOverlay: "",
-    sound: ""      
+    sound: ""
   });
 
-  // --- HELPER: Hex to RGBA ---
   const hexToRGBA = (hex, alpha = 1) => {
     if (!hex) return `rgba(255, 255, 255, ${alpha})`;
     try {
@@ -45,7 +46,6 @@ const ChatProvider = ({ children }) => {
     }
   };
 
-  // --- 4. THEME SYNC ENGINE ---
   useEffect(() => {
     const root = document.documentElement;
     root.style.setProperty("--font-family", config.font);
@@ -74,7 +74,6 @@ const ChatProvider = ({ children }) => {
     localStorage.setItem("user-config", JSON.stringify(config));
   }, [theme, config]);
 
-  // --- 5. AUTH LOGIC ---
   useEffect(() => {
     const userInfo = JSON.parse(localStorage.getItem("userInfo"));
     if (userInfo) {
@@ -85,7 +84,42 @@ const ChatProvider = ({ children }) => {
     }
   }, [navigate]);
 
-  // --- 6. AI EMOJI ENGINE ---
+  // ✅ Socket setup — user login hone ke baad ek baar
+  useEffect(() => {
+    if (!user) return;
+
+    globalSocket = io(ENDPOINT);
+    globalSocket.emit("setup", user);
+
+    // ✅ Incoming message — MyChats mein notification update karo
+    globalSocket.on("message received", (newMsg) => {
+      setNotification((prev) => {
+        // Already hai toh add mat karo
+        const exists = prev.find((n) => n._id === newMsg._id);
+        if (exists) return prev;
+        return [newMsg, ...prev];
+      });
+
+      // Chat list mein latest message update karo
+      setChats((prev) => {
+        const exists = prev.find((c) => c._id === newMsg.chat._id);
+        if (!exists) return prev;
+        return prev
+          .map((c) => c._id === newMsg.chat._id ? { ...c, latestMessage: newMsg } : c)
+          .sort((a, b) => {
+            const at = a.latestMessage?.createdAt ? new Date(a.latestMessage.createdAt) : 0;
+            const bt = b.latestMessage?.createdAt ? new Date(b.latestMessage.createdAt) : 0;
+            return bt - at;
+          });
+      });
+    });
+
+    return () => {
+      globalSocket?.disconnect();
+      globalSocket = null;
+    };
+  }, [user]);
+
   const getAIEmojis = (text) => {
     const input = text.toLowerCase();
     if (input.includes("kaisa") || input.includes("hey")) return ["👋", "✨", "🔥"];
@@ -101,7 +135,7 @@ const ChatProvider = ({ children }) => {
         user, setUser,
         selectedChat, setSelectedChat,
         chats, setChats,
-        notification, setNotification, // 🔥 Pass kiya Context mein
+        notification, setNotification,
         theme, setTheme,
         config, setConfig,
         assets,

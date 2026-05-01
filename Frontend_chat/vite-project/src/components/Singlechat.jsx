@@ -1,10 +1,9 @@
 import React, { useEffect, useState, useRef } from "react";
 import API from "../services/api";
 import io from "socket.io-client";
-import { ChatState } from "../Context/ChatProvider";
+import { ChatState, globalSocket as _gs } from "../Context/ChatProvider";
 
 const ENDPOINT = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
-let socketInstance = null;
 
 const MOOD_COLORS = [
   "#6366f1", "#8b5cf6", "#ec4899", "#f43f5e",
@@ -12,7 +11,6 @@ const MOOD_COLORS = [
   "#3b82f6", "#a855f7",
 ];
 
-// ✅ Extended Emoji List (30 Emojis)
 const QUICK_EMOJIS = [
   "😂", "❤️", "🔥", "😍", "🥹", "💀", "🤯", "😎", "🥰", "👑",
   "💯", "🚀", "✨", "🫶", "😭", "🙏", "👀", "🤫", "🥳", "😤",
@@ -36,6 +34,13 @@ const playClickSound = () => {
   } catch (e) {}
 };
 
+// ✅ globalSocket ko ref se access karo — always latest value mile
+const getSocket = () => {
+  // ChatProvider ka globalSocket use karo
+  const { globalSocket } = require("../Context/ChatProvider");
+  return globalSocket;
+};
+
 const SingleChat = ({ fetchagain, setFetchagain, onMoodChange }) => {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
@@ -55,6 +60,9 @@ const SingleChat = ({ fetchagain, setFetchagain, onMoodChange }) => {
   const [activeMenu, setActiveMenu] = useState(null);
   const longPressTimerRef = useRef(null);
   const isLongPressRef = useRef(false);
+
+  // ✅ Local socket sirf SingleChat ke liye (typing, mood, delete events)
+  const socketRef = useRef(null);
 
   const messagesEndRef = useRef(null);
   const containerRef = useRef(null);
@@ -109,24 +117,26 @@ const SingleChat = ({ fetchagain, setFetchagain, onMoodChange }) => {
     setTimeout(() => setFlyingEmoji(null), 2000);
   };
 
+  // ✅ Socket setup — typing, mood, delete, emoji events
   useEffect(() => {
     if (!user) return;
-    socketInstance = io(ENDPOINT);
-    socketInstance.emit("setup", user);
 
-    socketInstance.on("typing", () => setIsTyping(true));
-    socketInstance.on("stop typing", () => setIsTyping(false));
+    socketRef.current = io(ENDPOINT);
+    socketRef.current.emit("setup", user);
 
-    socketInstance.on("mood change", ({ moodIndex: idx }) => {
+    socketRef.current.on("typing", () => setIsTyping(true));
+    socketRef.current.on("stop typing", () => setIsTyping(false));
+
+    socketRef.current.on("mood change", ({ moodIndex: idx }) => {
       setOtherMoodIndex(idx);
       onMoodChange?.(MOOD_COLORS[idx]);
     });
 
-    socketInstance.on("emoji reaction", ({ emoji }) => {
+    socketRef.current.on("emoji reaction", ({ emoji }) => {
       showFlyingEmoji(emoji);
     });
 
-    socketInstance.on("message deleted", ({ messageId }) => {
+    socketRef.current.on("message deleted", ({ messageId }) => {
       setMessages((prev) =>
         prev.map((m) =>
           m._id === messageId
@@ -136,19 +146,23 @@ const SingleChat = ({ fetchagain, setFetchagain, onMoodChange }) => {
       );
     });
 
-    socketInstance.on("message received", (newMsg) => {
+    // ✅ message received — sirf current chat ke messages update karo
+    socketRef.current.on("message received", (newMsg) => {
       const currentChat = selectedChatRef.current;
-      if (!currentChat || currentChat._id !== newMsg.chat._id) {
-        setNotification?.((prev) => [newMsg, ...prev]);
-      } else {
-        setMessages((prev) => [...prev, newMsg]);
+      if (currentChat && currentChat._id === newMsg.chat._id) {
+        setMessages((prev) => {
+          // Duplicate check
+          if (prev.find((m) => m._id === newMsg._id)) return prev;
+          return [...prev, newMsg];
+        });
         setTimeout(scrollToBottom, 100);
       }
+      // Note: MyChats notification ChatProvider ke global socket se handle ho raha hai
     });
 
     return () => {
-      socketInstance.disconnect();
-      socketInstance = null;
+      socketRef.current?.disconnect();
+      socketRef.current = null;
     };
   }, [user]);
 
@@ -163,12 +177,10 @@ const SingleChat = ({ fetchagain, setFetchagain, onMoodChange }) => {
       setMessages((prev) => (pageNum === 1 ? newMsgs : [...newMsgs, ...prev]));
       setHasMore(data.hasMore || false);
       if (pageNum === 1) {
-        socketInstance?.emit("join chat", selectedChat._id);
+        socketRef.current?.emit("join chat", selectedChat._id);
         setTimeout(scrollToBottom, 200);
         const lastEmoji = [...newMsgs].reverse().find((m) => m.isEmoji);
-        if (lastEmoji) {
-          setTimeout(() => showFlyingEmoji(lastEmoji.content), 400);
-        }
+        if (lastEmoji) setTimeout(() => showFlyingEmoji(lastEmoji.content), 400);
       }
     } catch (err) {
       console.error("Fetch error:", err);
@@ -203,7 +215,7 @@ const SingleChat = ({ fetchagain, setFetchagain, onMoodChange }) => {
 
   const sendMessage = async (event) => {
     if ((event.key === "Enter" || event.type === "click") && newMessage.trim()) {
-      socketInstance?.emit("stop typing", selectedChat._id);
+      socketRef.current?.emit("stop typing", selectedChat._id);
       try {
         const content = newMessage;
         setNewMessage("");
@@ -212,7 +224,7 @@ const SingleChat = ({ fetchagain, setFetchagain, onMoodChange }) => {
           { content, chatid: selectedChat._id },
           getAuthHeader()
         );
-        socketInstance?.emit("new message", data);
+        socketRef.current?.emit("new message", data);
         setMessages((prev) => [...prev, data]);
         setTimeout(scrollToBottom, 50);
       } catch (err) {
@@ -236,7 +248,7 @@ const SingleChat = ({ fetchagain, setFetchagain, onMoodChange }) => {
               : m
           )
         );
-        socketInstance?.emit("message deleted", { messageId, chatId: selectedChat._id });
+        socketRef.current?.emit("message deleted", { messageId, chatId: selectedChat._id });
       } else {
         setMessages((prev) => prev.filter((m) => m._id !== messageId));
       }
@@ -255,8 +267,8 @@ const SingleChat = ({ fetchagain, setFetchagain, onMoodChange }) => {
         getAuthHeader()
       );
       setMessages((prev) => [...prev, data]);
-      socketInstance?.emit("new message", data);
-      socketInstance?.emit("emoji reaction", { chatId: selectedChat._id, emoji });
+      socketRef.current?.emit("new message", data);
+      socketRef.current?.emit("emoji reaction", { chatId: selectedChat._id, emoji });
     } catch (err) {
       console.error("Emoji send error:", err);
     }
@@ -269,33 +281,31 @@ const SingleChat = ({ fetchagain, setFetchagain, onMoodChange }) => {
     moodIndexRef.current = nextIndex;
     setMoodIndex(nextIndex);
     onMoodChange?.(MOOD_COLORS[nextIndex]);
-    socketInstance?.emit("mood change", { chatId: selectedChat._id, moodIndex: nextIndex });
+    socketRef.current?.emit("mood change", { chatId: selectedChat._id, moodIndex: nextIndex });
     if (!typing) {
       setTyping(true);
-      socketInstance?.emit("typing", selectedChat._id);
+      socketRef.current?.emit("typing", selectedChat._id);
     }
     const lastTypingTime = new Date().getTime();
     setTimeout(() => {
       if (new Date().getTime() - lastTypingTime >= 3000 && typing) {
-        socketInstance?.emit("stop typing", selectedChat._id);
+        socketRef.current?.emit("stop typing", selectedChat._id);
         setTyping(false);
       }
     }, 3000);
   };
 
-  // ✅ MOBILE FIX: Better Long Press Logic
   const handleTouchStart = (msgId) => {
     isLongPressRef.current = false;
     longPressTimerRef.current = setTimeout(() => {
       isLongPressRef.current = true;
       setActiveMenu(msgId);
-      if (window.navigator.vibrate) window.navigator.vibrate(50); // Haptic feedback
-    }, 600); // 600ms long press
+      if (window.navigator.vibrate) window.navigator.vibrate(50);
+    }, 600);
   };
 
   const handleTouchEnd = (e) => {
     clearTimeout(longPressTimerRef.current);
-    // Agar menu khul gaya hai toh tap action prevent karo
     if (isLongPressRef.current) {
       e.preventDefault();
       e.stopPropagation();
@@ -303,7 +313,6 @@ const SingleChat = ({ fetchagain, setFetchagain, onMoodChange }) => {
   };
 
   const handleTouchMove = () => {
-    // Agar user scroll kar raha hai toh long press cancel
     clearTimeout(longPressTimerRef.current);
     isLongPressRef.current = false;
   };
@@ -311,8 +320,7 @@ const SingleChat = ({ fetchagain, setFetchagain, onMoodChange }) => {
   const groupedMessages = messages.reduce((groups, msg) => {
     if (!msg?.createdAt) return groups;
     const date = new Date(msg.createdAt).toLocaleDateString("en-IN", {
-      day: "numeric",
-      month: "short",
+      day: "numeric", month: "short",
     });
     if (!groups[date]) groups[date] = [];
     groups[date].push(msg);
@@ -326,34 +334,24 @@ const SingleChat = ({ fetchagain, setFetchagain, onMoodChange }) => {
           0%, 100% { opacity: 0.3; transform: translateY(0); }
           50%       { opacity: 1; transform: translateY(-3px); }
         }
-        .typing-dot {
-          width: 4px; height: 4px; border-radius: 50%;
-          animation: typingPulse 1.2s ease infinite;
-        }
+        .typing-dot { width: 4px; height: 4px; border-radius: 50%; animation: typingPulse 1.2s ease infinite; }
         .sc-scroll::-webkit-scrollbar { width: 3px; }
-        .sc-scroll::-webkit-scrollbar-thumb {
-          background: ${rgba(accentColor, 0.4)}; border-radius: 10px;
-        }
+        .sc-scroll::-webkit-scrollbar-thumb { background: ${rgba(accentColor, 0.4)}; border-radius: 10px; }
         .msg-bubble {
           transition: background-color 0.4s ease, border-color 0.4s ease;
-          -webkit-user-select: none; user-select: none;
-          touch-action: manipulation;
+          -webkit-user-select: none; user-select: none; touch-action: manipulation;
         }
         @keyframes emojiMsgPop {
           0%   { transform: scale(0.3); opacity: 0; }
           70%  { transform: scale(1.2); opacity: 1; }
           100% { transform: scale(1);   opacity: 1; }
         }
-        .emoji-msg-bubble {
-          animation: emojiMsgPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-        }
+        .emoji-msg-bubble { animation: emojiMsgPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
         @keyframes menuIn {
           from { opacity: 0; transform: scale(0.9) translateY(10px); }
           to   { opacity: 1; transform: scale(1) translateY(0); }
         }
-        .delete-menu {
-          animation: menuIn 0.15s cubic-bezier(0.2, 0, 0.2, 1) forwards;
-        }
+        .delete-menu { animation: menuIn 0.15s cubic-bezier(0.2, 0, 0.2, 1) forwards; }
         @keyframes emojiFloat {
           0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.3); }
           20%  { opacity: 1; transform: translate(-50%, -50%) scale(1.3); }
@@ -366,21 +364,21 @@ const SingleChat = ({ fetchagain, setFetchagain, onMoodChange }) => {
           animation: emojiFloat 2s ease forwards;
           filter: drop-shadow(0 0 30px rgba(255,255,255,0.3));
         }
-        .emoji-picker-container {
-          max-height: 250px; overflow-y: auto;
-        }
+        .emoji-picker-container { max-height: 250px; overflow-y: auto; }
         .emoji-picker-container::-webkit-scrollbar { width: 0; }
       `}</style>
 
-      {flyingEmoji && (
-        <div key={flyingEmoji.id} className="flying-emoji">{flyingEmoji.emoji}</div>
-      )}
+      {flyingEmoji && <div key={flyingEmoji.id} className="flying-emoji">{flyingEmoji.emoji}</div>}
 
       {activeMenu && (
-        <div className="fixed inset-0 z-40" onClick={() => setActiveMenu(null)} onTouchStart={() => setActiveMenu(null)} />
+        <div className="fixed inset-0 z-40"
+          onClick={() => setActiveMenu(null)}
+          onTouchStart={() => setActiveMenu(null)} />
       )}
 
-      <div className="sc-scroll flex-1 overflow-y-auto px-4 py-6" style={{ minHeight: 0, background: "transparent" }} ref={containerRef} onScroll={handleScroll}>
+      <div className="sc-scroll flex-1 overflow-y-auto px-4 py-6"
+        style={{ minHeight: 0, background: "transparent" }}
+        ref={containerRef} onScroll={handleScroll}>
         {loadingMore && <div className="text-center text-[10px] py-2 text-white/30">Loading older messages...</div>}
 
         {Object.entries(groupedMessages).map(([date, msgs]) => (
@@ -407,44 +405,40 @@ const SingleChat = ({ fetchagain, setFetchagain, onMoodChange }) => {
 
                 return (
                   <div key={m._id || i} className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
-                    <div 
-                      className="relative" 
-                      style={{ display: "inline-flex", maxWidth: "82%" }}
+                    <div className="relative" style={{ display: "inline-flex", maxWidth: "82%" }}
                       onContextMenu={(e) => { e.preventDefault(); setActiveMenu(m._id); }}
                       onTouchStart={() => handleTouchStart(m._id)}
                       onTouchEnd={handleTouchEnd}
-                      onTouchMove={handleTouchMove}
-                    >
+                      onTouchMove={handleTouchMove}>
+
                       {activeMenu === m._id && !isDeleted && (
-                        <div 
-                          className="delete-menu absolute z-50 rounded-2xl overflow-hidden"
+                        <div className="delete-menu absolute z-50 rounded-2xl overflow-hidden"
                           style={{
                             background: "#161616", border: `1px solid ${rgba(accentColor, 0.3)}`,
                             bottom: "calc(100% + 8px)", ...(isMine ? { right: 0 } : { left: 0 }),
                             minWidth: "180px", boxShadow: "0 10px 40px rgba(0,0,0,0.7)"
-                          }}
-                        >
+                          }}>
                           {isMine && (
-                            <button onClick={() => handleDelete(m._id, true)} className="flex items-center gap-3 px-5 py-3.5 text-[13px] text-red-400 font-bold w-full text-left active:bg-red-500/10 border-b border-white/5">
+                            <button onClick={() => handleDelete(m._id, true)}
+                              className="flex items-center gap-3 px-5 py-3.5 text-[13px] text-red-400 font-bold w-full text-left active:bg-red-500/10 border-b border-white/5">
                               🗑️ Delete for Everyone
                             </button>
                           )}
-                          <button onClick={() => handleDelete(m._id, false)} className="flex items-center gap-3 px-5 py-3.5 text-[13px] text-white/70 w-full text-left active:bg-white/5">
+                          <button onClick={() => handleDelete(m._id, false)}
+                            className="flex items-center gap-3 px-5 py-3.5 text-[13px] text-white/70 w-full text-left active:bg-white/5">
                             🙈 Delete for Me
                           </button>
                         </div>
                       )}
 
-                      <div 
-                        className="msg-bubble px-5 py-3.5 text-[14.5px] leading-relaxed"
+                      <div className="msg-bubble px-5 py-3.5 text-[14.5px] leading-relaxed"
                         style={{
                           borderRadius: isMine ? "20px 20px 4px 20px" : "20px 20px 20px 4px",
                           backgroundColor: isDeleted ? "rgba(255,255,255,0.03)" : isMine ? rgba(accentColor, 0.2) : "rgba(255,255,255,0.08)",
                           border: `1px solid ${isDeleted ? "rgba(255,255,255,0.06)" : isMine ? rgba(accentColor, 0.4) : "rgba(255,255,255,0.12)"}`,
                           color: isDeleted ? "rgba(255,255,255,0.3)" : "#fff",
                           fontStyle: isDeleted ? "italic" : "normal"
-                        }}
-                      >
+                        }}>
                         {m.content}
                       </div>
                     </div>
@@ -454,8 +448,10 @@ const SingleChat = ({ fetchagain, setFetchagain, onMoodChange }) => {
             </div>
           </div>
         ))}
+
         {isTyping && (
-          <div className="flex gap-1.5 p-3 mt-2 w-fit rounded-2xl" style={{ background: rgba(MOOD_COLORS[otherMoodIndex], 0.1), border: `1px solid ${rgba(MOOD_COLORS[otherMoodIndex], 0.2)}` }}>
+          <div className="flex gap-1.5 p-3 mt-2 w-fit rounded-2xl"
+            style={{ background: rgba(MOOD_COLORS[otherMoodIndex], 0.1), border: `1px solid ${rgba(MOOD_COLORS[otherMoodIndex], 0.2)}` }}>
             <div className="typing-dot" style={{ background: MOOD_COLORS[otherMoodIndex], animationDelay: "0s" }} />
             <div className="typing-dot" style={{ background: MOOD_COLORS[otherMoodIndex], animationDelay: "0.2s" }} />
             <div className="typing-dot" style={{ background: MOOD_COLORS[otherMoodIndex], animationDelay: "0.4s" }} />
@@ -464,13 +460,17 @@ const SingleChat = ({ fetchagain, setFetchagain, onMoodChange }) => {
         <div ref={messagesEndRef} />
       </div>
 
-      <footer className="flex-shrink-0 p-4 relative" style={{ background: "#0a0a0a", borderTop: `1px solid ${rgba(accentColor, 0.15)}` }}>
+      <footer className="flex-shrink-0 p-4 relative"
+        style={{ background: "#0a0a0a", borderTop: `1px solid ${rgba(accentColor, 0.15)}` }}>
         {showPicker && (
-          <div ref={pickerRef} className="emoji-picker absolute bottom-[85px] right-4 rounded-2xl p-3 z-50 w-[280px]" style={{ background: "#111", border: `1px solid ${rgba(accentColor, 0.25)}`, boxShadow: "0 10px 40px rgba(0,0,0,0.6)" }}>
+          <div ref={pickerRef} className="emoji-picker absolute bottom-[85px] right-4 rounded-2xl p-3 z-50 w-[280px]"
+            style={{ background: "#111", border: `1px solid ${rgba(accentColor, 0.25)}`, boxShadow: "0 10px 40px rgba(0,0,0,0.6)" }}>
             <p className="text-[9px] uppercase tracking-widest mb-3 px-1" style={{ color: rgba(accentColor, 0.6) }}>Select Emoji</p>
             <div className="emoji-picker-container grid grid-cols-5 gap-2">
               {QUICK_EMOJIS.map((emoji) => (
-                <button key={emoji} onClick={() => sendEmojiReaction(emoji)} className="w-11 h-11 flex items-center justify-center rounded-xl text-2xl active:scale-75 transition-transform" style={{ background: rgba(accentColor, 0.08) }}>
+                <button key={emoji} onClick={() => sendEmojiReaction(emoji)}
+                  className="w-11 h-11 flex items-center justify-center rounded-xl text-2xl active:scale-75 transition-transform"
+                  style={{ background: rgba(accentColor, 0.08) }}>
                   {emoji}
                 </button>
               ))}
@@ -478,12 +478,23 @@ const SingleChat = ({ fetchagain, setFetchagain, onMoodChange }) => {
           </div>
         )}
 
-        <div className="flex items-center gap-2 pl-5 pr-2 py-2 rounded-[28px]" style={{ background: rgba(accentColor, 0.06), border: `1px solid ${rgba(accentColor, 0.2)}` }}>
-          <button onClick={() => setShowPicker(!showPicker)} className="w-9 h-9 flex items-center justify-center rounded-xl active:scale-90" style={{ background: showPicker ? rgba(accentColor, 0.2) : "transparent", color: accentColor }}>
-             <span style={{ fontSize: "18px", letterSpacing: "-1px" }}>•••</span>
+        <div className="flex items-center gap-2 pl-5 pr-2 py-2 rounded-[28px]"
+          style={{ background: rgba(accentColor, 0.06), border: `1px solid ${rgba(accentColor, 0.2)}` }}>
+          <button onClick={() => setShowPicker(!showPicker)}
+            className="w-9 h-9 flex items-center justify-center rounded-xl active:scale-90"
+            style={{ background: showPicker ? rgba(accentColor, 0.2) : "transparent", color: accentColor }}>
+            <span style={{ fontSize: "18px", letterSpacing: "-1px" }}>•••</span>
           </button>
-          <input value={newMessage} onChange={typingHandler} onKeyDown={sendMessage} onFocus={() => setTimeout(scrollToBottom, 150)} placeholder="Type to vibe..." className="flex-1 bg-transparent outline-none text-white py-2" style={{ fontSize: "16px" }} />
-          <button onClick={sendMessage} className="w-11 h-11 flex items-center justify-center rounded-full active:scale-90" style={{ backgroundColor: accentColor, color: "#000", boxShadow: `0 0 12px ${rgba(accentColor, 0.4)}` }}>➤</button>
+          <input value={newMessage} onChange={typingHandler} onKeyDown={sendMessage}
+            onFocus={() => setTimeout(scrollToBottom, 150)}
+            placeholder="Type to vibe..."
+            className="flex-1 bg-transparent outline-none text-white py-2"
+            style={{ fontSize: "16px" }} />
+          <button onClick={sendMessage}
+            className="w-11 h-11 flex items-center justify-center rounded-full active:scale-90"
+            style={{ backgroundColor: accentColor, color: "#000", boxShadow: `0 0 12px ${rgba(accentColor, 0.4)}` }}>
+            ➤
+          </button>
         </div>
       </footer>
     </>
