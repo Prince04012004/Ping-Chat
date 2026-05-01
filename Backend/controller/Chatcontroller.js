@@ -3,7 +3,7 @@ import Chat from "../models/Chat.js";
 
 
 
-const accessChat = async (userId) => {
+export const accessChat = async (userId) => {
   try {
     setLoading(true);
     const token = user?.token || localStorage.getItem("token");
