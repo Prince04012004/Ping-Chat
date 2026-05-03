@@ -23,6 +23,9 @@ app.use(cors({
 
 app.use(express.json());
 
+// ✅ Health check endpoint — server ko jaagta rakhne ke liye
+app.get('/api/health', (req, res) => res.json({ status: 'ok', time: new Date() }));
+
 app.use('/api', authroutes);
 app.use('/api', useroute);
 app.use('/api', chatroutes);
@@ -54,7 +57,6 @@ io.on("connection", (socket) => {
         console.log("User joined chat room: " + room);
     });
 
-    // Typing indicators
     socket.on("typing", (room) => {
         socket.in(room).emit("typing");
     });
@@ -63,19 +65,16 @@ io.on("connection", (socket) => {
         socket.in(room).emit("stop typing");
     });
 
-    // 🎨 Mood change — typing ke saath color sync
     socket.on("mood change", ({ chatId, moodIndex }) => {
         if (!chatId) return;
         socket.in(chatId).emit("mood change", { moodIndex });
     });
 
-    // 😂 Emoji reaction — full screen animation dono users ko
     socket.on("emoji reaction", ({ chatId, emoji }) => {
         if (!chatId || !emoji) return;
         io.in(chatId).emit("emoji reaction", { emoji });
     });
 
-    // 🗑️ Delete for everyone — dusre user ko batao
     socket.on("message deleted", ({ messageId, chatId }) => {
         if (!messageId || !chatId) return;
         socket.in(chatId).emit("message deleted", { messageId });
@@ -84,7 +83,6 @@ io.on("connection", (socket) => {
     socket.on("new message", (newMessagereceived) => {
         var chat = newMessagereceived.chat;
         if (!chat.users) return console.log("chat.users is not defined");
-
         chat.users.forEach((user) => {
             if (user._id === newMessagereceived.sender._id) return;
             socket.in(user._id).emit("message received", newMessagereceived);
