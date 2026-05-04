@@ -3,11 +3,16 @@ import nodemailer from "nodemailer";
 const sendEmail = async (email, otp) => {
   try {
     const transporter = nodemailer.createTransport({
-      service: "gmail",
+      host: "smtp.gmail.com",
+      port: 465,
+      secure: true,
       auth: {
-        user: process.env.EMAIL_USER,     // tera Gmail: abc@gmail.com
-        pass: process.env.EMAIL_PASS,     // App Password (neeche samjha raha hoon)
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
       },
+      connectionTimeout: 15000,
+      greetingTimeout: 15000,
+      socketTimeout: 20000,
     });
 
     const mailOptions = {
@@ -31,10 +36,11 @@ const sendEmail = async (email, otp) => {
     };
 
     const info = await transporter.sendMail(mailOptions);
-    console.log("🔥 OTP sent successfully! Message ID:", info.messageId);
+    console.log("🔥 OTP sent! Message ID:", info.messageId);
 
   } catch (error) {
     console.error("🚨 Email Error:", error.message);
+    throw error;
   }
 };
 
