@@ -1,4 +1,8 @@
 import nodemailer from "nodemailer";
+import dns from "dns";
+
+// ✅ Force IPv4 — Render pe IPv6 blocked hai
+dns.setDefaultResultOrder("ipv4first");
 
 const sendEmail = async (email, otp) => {
   try {
@@ -6,6 +10,7 @@ const sendEmail = async (email, otp) => {
       host: "smtp.gmail.com",
       port: 465,
       secure: true,
+      family: 4, // Force IPv4
       auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS,
