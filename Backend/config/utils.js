@@ -1,51 +1,38 @@
 import nodemailer from "nodemailer";
-import dns from "dns";
-
-dns.setDefaultResultOrder("ipv4first");
 
 const sendEmail = async (email, otp) => {
   try {
     const transporter = nodemailer.createTransport({
-      host: "smtp.gmail.com",
-      port: 587,       // ✅ 465 → 587 (TLS, Render pe work karta hai)
-      secure: false,    // ✅ 587 ke liye false hona chahiye
-                        // ❌ family:4 hata diya — invalid option tha
+      service: "gmail",
       auth: {
+        type: "OAuth2",
         user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
+        clientId: process.env.GOOGLE_CLIENT_ID,
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+        refreshToken: process.env.GOOGLE_REFRESH_TOKEN,
       },
-      tls: {
-        rejectUnauthorized: false,  // ✅ Render SSL issues fix
-      },
-      connectionTimeout: 15000,
-      greetingTimeout: 15000,
-      socketTimeout: 20000,
     });
-
-    // ✅ Connection verify karo pehle (debug ke liye)
-    await transporter.verify();
-    console.log("✅ SMTP connected");
 
     const mailOptions = {
       from: `"Ping-Chat" <${process.env.EMAIL_USER}>`,
       to: email,
       subject: `🔐 ${otp} is your Ping-Chat code`,
       html: `
-        <div style="font-family: 'Segoe UI', sans-serif; max-width: 450px; margin: auto;
-          border: 1px solid #eee; border-radius: 15px; padding: 30px; text-align: center;">
-          <h1 style="color: #10b981;">Ping-Chat</h1>
-          <p style="color: #666; font-size: 16px;">Verify your email to start chatting.</p>
-          <div style="margin: 25px 0; padding: 20px; background: #f8fafc;
-            border-radius: 12px; border: 1px dashed #cbd5e1;">
-            <span style="font-size: 32px; font-weight: 800; letter-spacing: 8px; color: #0f172a;">
-              ${otp}
-            </span>
+        <div style="font-family:'Segoe UI',sans-serif; max-width:450px;
+          margin:auto; border:1px solid #eee; border-radius:15px;
+          padding:30px; text-align:center;">
+          <h1 style="color:#10b981;">Ping-Chat</h1>
+          <p style="color:#666; font-size:16px;">
+            Verify your email to start chatting.
+          </p>
+          <div style="margin:25px 0; padding:20px; background:#f8fafc;
+            border-radius:12px; border:1px dashed #cbd5e1;">
+            <span style="font-size:32px; font-weight:800;
+              letter-spacing:8px; color:#0f172a;">${otp}</span>
           </div>
-          <p style="font-size: 13px; color: #94a3b8;">
+          <p style="font-size:13px; color:#94a3b8;">
             Valid for 10 minutes. Didn't request this? Ignore it.
           </p>
-          <hr style="border: 0; border-top: 1px solid #f1f5f9; margin: 25px 0;">
-          <p style="font-size: 11px; color: #cbd5e1;">© 2026 Ping-Chat</p>
         </div>
       `,
     };
