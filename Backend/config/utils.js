@@ -1,20 +1,12 @@
-import nodemailer from "nodemailer";
+import { Resend } from "resend";
+
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 const sendEmail = async (email, otp) => {
   try {
-    const transporter = nodemailer.createTransport({
-      host: "in-v3.mailjet.com",
-      port: 587,
-      secure: false,
-      auth: {
-        user: process.env.MAILJET_API_KEY,
-        pass: process.env.MAILJET_SECRET_KEY,
-      },
-    });
-
-    const mailOptions = {
-      from: `"Ping-Chat" <${process.env.EMAIL_USER}>`,
-      to: email,
+    const { data, error } = await resend.emails.send({
+      from: "Ping-Chat <onboarding@resend.dev>",
+      to: [email],
       subject: `🔐 ${otp} is your Ping-Chat code`,
       html: `
         <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 450px; margin: auto; border: 1px solid #eee; border-radius: 15px; padding: 30px; text-align: center;">
@@ -30,14 +22,18 @@ const sendEmail = async (email, otp) => {
           <p style="font-size: 11px; color: #cbd5e1;">&copy; 2026 Ping-Chat Secure Node</p>
         </div>
       `,
-    };
+    });
 
-    const info = await transporter.sendMail(mailOptions);
-    console.log("🔥 OTP sent! Message ID:", info.messageId);
+    if (error) {
+      console.error("🚨 Resend Error:", error);
+      throw new Error(error.message);
+    }
 
-  } catch (error) {
-    console.error("🚨 Email Error:", error.message);
-    throw error;
+    console.log("🔥 OTP sent! ID:", data?.id);
+
+  } catch (err) {
+    console.error("🚨 Email Error:", err.message);
+    throw err;
   }
 };
 
