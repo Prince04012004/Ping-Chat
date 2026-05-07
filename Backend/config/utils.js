@@ -3,22 +3,13 @@ import nodemailer from "nodemailer";
 const sendEmail = async (email, otp) => {
   try {
     const transporter = nodemailer.createTransport({
-      // Hum host mein domain ki jagah IP bhi daal sakte hain, 
-      // lekin Gmail ke liye 'service' parameter sabse best kaam karta hai Render pe.
-      service: "gmail", 
-      host: "smtp.gmail.com",
+      host: "in-v3.mailjet.com",
       port: 587,
       secure: false,
       auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
+        user: process.env.MAILJET_API_KEY,
+        pass: process.env.MAILJET_SECRET_KEY,
       },
-      // 🚨 Sabse important part: Force IPv4 stack
-      family: 4, 
-      tls: {
-        // Render ke networking issues se bachne ke liye
-        rejectUnauthorized: false
-      }
     });
 
     const mailOptions = {
@@ -26,21 +17,26 @@ const sendEmail = async (email, otp) => {
       to: email,
       subject: `🔐 ${otp} is your Ping-Chat code`,
       html: `
-        <div style="font-family: sans-serif; max-width: 400px; margin: auto; border: 1px solid #ddd; padding: 20px; border-radius: 10px;">
-          <h2 style="color: #10b981;">Ping-Chat Verification</h2>
-          <p>Your OTP is:</p>
-          <h1 style="letter-spacing: 5px; text-align: center; background: #f4f4f4; padding: 10px;">${otp}</h1>
+        <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 450px; margin: auto; border: 1px solid #eee; border-radius: 15px; padding: 30px; text-align: center;">
+          <h1 style="color: #10b981; margin-bottom: 10px;">Ping-Chat</h1>
+          <p style="color: #666; font-size: 16px;">Verify your email to start chatting.</p>
+          
+          <div style="margin: 25px 0; padding: 20px; background: #f8fafc; border-radius: 12px; border: 1px dashed #cbd5e1;">
+            <span style="font-size: 32px; font-weight: 800; letter-spacing: 8px; color: #0f172a;">${otp}</span>
+          </div>
+          
+          <p style="font-size: 13px; color: #94a3b8;">This code is valid for 10 minutes. If you didn't request this, ignore this email.</p>
+          <hr style="border: 0; border-top: 1px solid #f1f5f9; margin: 25px 0;">
+          <p style="font-size: 11px; color: #cbd5e1;">&copy; 2026 Ping-Chat Secure Node</p>
         </div>
       `,
     };
 
     const info = await transporter.sendMail(mailOptions);
-    console.log("✅ Email sent successfully!");
-    return info;
+    console.log("🔥 OTP sent! Message ID:", info.messageId);
 
   } catch (error) {
-    // Agar ab bhi fail ho, toh error detail check karo
-    console.error("🚨 Detailed Error:", error.code, error.command);
+    console.error("🚨 Email Error:", error.message);
     throw error;
   }
 };
