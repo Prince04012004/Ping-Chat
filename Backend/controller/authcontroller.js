@@ -11,16 +11,15 @@ export const sendOTP = async (req, res) => {
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
-    // Purane OTP delete karo taaki garbage na bhare
+    // Purane OTP delete karo
     await Otp.deleteMany({ email });
 
-    // DB mein save karo (Yeh ab Otp collection mein dikhega)
+    // DB mein save karo
     await Otp.create({ email, otp });
 
-    // Email bhejo
-    await sendEmail(email, otp);
+    // ✅ OTP frontend ko bhejo — EmailJS se email jayega
+    res.status(200).json({ message: "OTP generated", otp });
 
-    res.status(200).json({ message: "OTP sent and saved in DB" });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
