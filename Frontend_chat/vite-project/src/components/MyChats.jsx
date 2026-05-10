@@ -33,7 +33,7 @@ const Mychats = () => {
   const userData = user?.user || user;
   const myId = (userData?._id || userData?.id)?.toString();
   const profileImage = userData?.profilepic || userData?.pic;
-  const blockedList = userData?.blockedList || [];
+ const blockedList = userData?.blockedusers || [];
 
   const hexToRGBA = (hex, alpha) => {
     try {
