@@ -17,10 +17,8 @@ export const sendOTP = async (req, res) => {
     // DB mein save karo
     await Otp.create({ email, otp });
 
-    // ✅ Email backend se hi bhejo (Resend), OTP response mein WAPAS MAT bhejo
-    await sendEmail(email, otp);
-
-    res.status(200).json({ message: "OTP sent to your email" });
+    // ✅ OTP frontend ko bhejo — EmailJS se email jayega
+    res.status(200).json({ message: "OTP generated", otp });
 
   } catch (error) {
     res.status(500).json({ message: error.message });

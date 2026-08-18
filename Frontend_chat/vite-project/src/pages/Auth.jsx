@@ -1,6 +1,12 @@
 import React, { useState, useEffect } from "react";
 import API from "../services/api";
 import { useNavigate } from 'react-router-dom';
+import emailjs from '@emailjs/browser';
+
+// ✅ EmailJS credentials
+const EMAILJS_SERVICE_ID = "service_fhln7bn";
+const EMAILJS_TEMPLATE_ID = "template_brnhz58";
+const EMAILJS_PUBLIC_KEY = "2gGonZL1BOeW1c7sh";
 
 const Auth = () => {
     const [email, setEmail] = useState("");
@@ -31,8 +37,20 @@ const Auth = () => {
                     return;
                 }
 
-                // ✅ Backend hi OTP generate karega AUR email bhi bhejega (Resend se)
-                await API.post("/api/sendotp", { email });
+                // ✅ Backend se OTP generate karwao
+                const res = await API.post("/api/sendotp", { email });
+                const generatedOtp = res.data.otp;
+
+                // ✅ EmailJS se OTP bhejo
+                await emailjs.send(
+                    EMAILJS_SERVICE_ID,
+                    EMAILJS_TEMPLATE_ID,
+                    {
+                        to_email: email,
+                        otp: generatedOtp,
+                    },
+                    EMAILJS_PUBLIC_KEY
+                );
 
                 setStep(2);
             } else {
