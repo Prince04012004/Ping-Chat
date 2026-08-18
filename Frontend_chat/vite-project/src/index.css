@@ -19,6 +19,11 @@
   --bg-pattern: none;       /* Background Image/Gradient */
 }
 
+/* Auth page brand mono accent — class specificity beats the universal `*` rule below */
+.auth-mono {
+  font-family: 'JetBrains Mono', monospace !important;
+}
+
 /* Global Reset */
 * {
   font-family: var(--font-family) !important;
